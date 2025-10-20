@@ -4,6 +4,9 @@ from typing import List
 import pandas as pd
 from django.db import transaction
 from .models import Dataset, Player
+from django.db.models import Count
+from django.core.exceptions import ValidationError
+
 
 def get_required(row, cols, key, as_str=False):
     """Ambil nilai dari kolom. Raise Exception jika kolom tidak ditemukan."""
@@ -23,8 +26,10 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
     """
     # Dataset
     cols = {c.lower(): c for c in df.columns}
-    # if "player" not in cols:
-    #     raise ValueError("Kolom nama pemain tidak ditemukan pada file.")
+
+    # --- CEK APAKAH SUDAH ADA DATASET DENGAN LIGA & MUSIM TERSEBUT ---
+    if Dataset.objects.filter(league_name=league_name.strip(), season=season.strip()).exists():
+        raise ValidationError(f"Data untuk {league_name} musim {season} sudah ada.")
 
     ds, created = Dataset.objects.get_or_create(
         league_name=league_name.strip(),
@@ -103,12 +108,15 @@ def get_seasons() -> List[str]:
         Dataset.objects.values_list("season", flat=True).distinct().order_by("season")
     )
 
-def get_players_by_season(season: str) -> List[str]:
-    return list(
-        Player.objects.filter(dataset__season=season)
-        .order_by("player")
-        .values_list("player", flat=True)
+def get_players_by_season(season: str, position: str) -> List[str]:
+    players = list(
+        Player.objects.filter(
+            dataset__season=season, 
+            position__icontains=position,
+        ).exclude(nationality="Indonesia").order_by("player").values_list("player", flat=True)
     )
+    print(len(players))
+    return players
 
 # utils/files.py
 import io
@@ -171,3 +179,24 @@ def get_player_detail(season: str, player_name: str) -> dict | None:
         .values(*fields)
         .first()
     )
+
+def get_list_of_dataset():
+    """
+    Kembalikan list dict: id, league_name, season, player_count, uploaded_at
+    """
+    return list(
+        Dataset.objects
+        .annotate(player_count=Count('players'))
+        .values('id', 'league_name', 'season', 'player_count', 'uploaded_at')
+        .order_by('-uploaded_at')
+    )
+
+def delete_dataset(dataset_id: int) -> bool:
+    """
+    Hapus 1 dataset (cascade akan hapus players-nya).
+    Return True jika ada yang terhapus.
+    """
+    deleted, _ = Dataset.objects.filter(id=dataset_id).delete()
+    return deleted > 0
+
+
