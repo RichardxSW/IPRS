@@ -122,6 +122,8 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
     return {
         "res_table": df_eval,
         "emb2d": X2,
+        "Xs": Xs,
+        "meta": df.reset_index(drop=True),
         "best_sil": best_sil,
         "best_dbi": best_dbi,
         "same_bw": same_bw,

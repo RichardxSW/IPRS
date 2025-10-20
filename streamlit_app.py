@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 import matplotlib.pyplot as plt
 import numpy as np
 import time
-from players.clustering import run_meanshift, run_meanshift_by_position
 
 # === Bootstrap Django ===
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -16,9 +15,10 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
 import django
 django.setup()
 
+from players.clustering import run_meanshift, run_meanshift_by_position
 # === Import services & utils ===
 from players.services import (
-    delete_dataset, get_list_of_dataset, get_player_detail, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
+    delete_dataset, get_list_of_dataset, get_player_detail, get_recommend_similar_players, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
 )
 
 st.set_page_config(page_title="IPRS", layout="wide")
@@ -237,7 +237,7 @@ elif page == "Analisis":
                     st.rerun()
     
             position_choices = [
-                "Pilih posisi pemain",
+                "Pilih posisi pemain acuan",
                 "ST",
                 "LW",
                 "RW",
@@ -251,9 +251,9 @@ elif page == "Analisis":
                 "RB"
             ]
 
-            selected_position = st.selectbox("Pilih posisi pemain", position_choices, index=0)
+            selected_position = st.selectbox("Pilih posisi pemain acuan", position_choices, index=0)
 
-            if selected_position != "Pilih posisi pemain":
+            if selected_position != "Pilih posisi pemain acuan":
                 players = get_players_by_season(selected_season, selected_position) if selected_season and selected_position else []
                 player_option = ["Pilih Pemain Acuan"] + players
                 selected_player = st.selectbox("Pilih Pemain Acuan", player_option, index=0)
@@ -309,14 +309,36 @@ elif page == "Analisis":
 
                 st.markdown("---")
                 st.subheader("Pemain Rekomendasi")
+
                 recommend_count = st.slider(
                     "Jumlah pemain rekomendasi",
                     min_value=1,
                     max_value=5,
                     step=1
                 )
+
+                only_indo = st.checkbox("Pemain Indonesia saja", value=False)
+                
                 if recommend_count and st.button("Cari pemain rekomendasi"):
-                    st.markdown("tes")
+                    try:
+                        recs = get_recommend_similar_players(
+                            season=selected_season,
+                            position_code=selected_position,   # "ST", "CM", ...
+                            anchor_player=selected_player,
+                            top_n=recommend_count,
+                            only_indonesian=only_indo,
+                        )
+                        if recs.empty:
+                            st.info("Tidak ada rekomendasi yang cocok untuk konfigurasi ini.")
+                        else:
+                            # tampilkan tabel ringkas
+                            cols_show = ["player", "team", "position", "nationality", "similarity"]
+                            cols_show = [c for c in cols_show if c in recs.columns]
+                            st.dataframe(
+                                recs[cols_show].assign(similarity=lambda d: d["similarity"].round(4)),                                
+                            )
+                    except Exception as e:
+                        st.error(f"Gagal mencari rekomendasi: {e}")
 
 
 elif page == "About":
