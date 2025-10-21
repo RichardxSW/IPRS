@@ -15,11 +15,12 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
 import django
 django.setup()
 
-from players.clustering import run_meanshift, run_meanshift_by_position
+from players.clustering import get_player_features_df, run_meanshift, run_meanshift_by_position
 # === Import services & utils ===
 from players.services import (
-    delete_dataset, get_list_of_dataset, get_player_detail, get_recommend_similar_players, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
+    delete_dataset, get_list_of_dataset, get_player_detail, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
 )
+from players.recommend import get_recommend_similar_players, prepare_comparison_long_df
 
 st.set_page_config(page_title="IPRS", layout="wide")
 
@@ -41,7 +42,7 @@ st.markdown(
 # =========================
 # NAVIGASI SIDEBAR (BUTTON)
 # =========================
-# st.sidebar.title("Navigasi")
+st.sidebar.title("IPRS")
 if "page" not in st.session_state:
     st.session_state.page = "Beranda"
 
@@ -72,8 +73,6 @@ if page == "Beranda":
     )
 
 elif page == "Unggah Dataset":
-    # st.header("Unggah Dataset")
-
     st.header("Template Dataset")
 
     data = {
@@ -106,7 +105,6 @@ elif page == "Unggah Dataset":
 
     df = pd.DataFrame(data)
     st.dataframe(df)
-    # st.write("Wajib **player_name**; opsional **team**, **position**, dan kolom fitur numerik.")
     st.download_button(
         "Download Template",
         data=make_template_excel_bytes(),
@@ -151,21 +149,22 @@ elif page == "Unggah Dataset":
     if not datasets:
         st.info("Belum ada data yang tersimpan")
     else:
-        col_head1, col_head2, col_head3, col_head4, col_head5 = st.columns([3, 2, 2, 2, 1])
+        col_head1, col_head2, col_head3, col_head4, col_head5 = st.columns([3, 2, 2, 2, 2])
         col_head1.write("**Liga**")
         col_head2.write("**Musim**")
         col_head3.write("**Jumlah Pemain**")
         col_head4.write("**Diunggah**")
-        col_head5.write("**Hapus**")
+        # col_head5.write("**Hapus**")
 
         for ds in datasets:
-            col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 1])
+            col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
             col1.write(ds["league_name"])
             col2.write(ds["season"])
             col3.write(ds["player_count"])
             col4.write(pd.to_datetime(ds["uploaded_at"]).strftime("%d-%m-%Y %H:%M"))
 
-            if col5.button("🗑️", key=f"del_{ds['id']}"):
+            # if col5.button("🗑️", key=f"del_{ds['id']}"):
+            if col5.button("Hapus", key=f"del_{ds['id']}"):
                 ok = delete_dataset(ds["id"])
                 if ok:
                     st.success(f"Data {ds['league_name']} musim ({ds['season']}) berhasil dihapus.")
@@ -251,7 +250,7 @@ elif page == "Analisis":
                 "RB"
             ]
 
-            selected_position = st.selectbox("Pilih posisi pemain acuan", position_choices, index=0)
+            selected_position = st.selectbox("Pilih Posisi Pemain Acuan", position_choices, index=0)
 
             if selected_position != "Pilih posisi pemain acuan":
                 players = get_players_by_season(selected_season, selected_position) if selected_season and selected_position else []
@@ -287,25 +286,25 @@ elif page == "Analisis":
                 col3, col4, col5 = st.columns(3)
 
                 with col3:
-                    st.write(f"Goal: {detail.get('total_goal')}")
-                    st.write(f"Assist: {detail.get('assist')}")
-                    st.write(f"Shot per game: {detail.get('shot_per_game'):.2f}")
-                    st.write(f"Shot on target per game: {detail.get('shot_per_game'):.2f}")
-                    st.write(f"Successful dribble per game: {detail.get('successful_dribble_per_game'):.2f}")
+                    st.write(f"Total Goal: {detail.get('total_goal')}")
+                    st.write(f"Total Assist: {detail.get('assist')}")
+                    st.write(f"Shot/Game: {detail.get('shot_per_game'):.2f}")
+                    st.write(f"Shot On Target/Game: {detail.get('sot_per_game'):.2f}")
+                    st.write(f"Successful Dribble/game: {detail.get('successful_dribble_per_game'):.2f}")
 
                 with col4:
-                    st.write(f"Successful pass per game: {detail.get('successful_pass_per_game'):.2f}")
-                    st.write(f"Key pass per game: {detail.get('key_pass_per_game'):.2f}")
-                    st.write(f"Long ball pass per game: {detail.get('long_ball_per_game'):.2f}")
-                    st.write(f"Successful crossing per game: {detail.get('successful_crossing_per_game'):.2f}")
+                    st.write(f"Successful Pass/Game: {detail.get('successful_pass_per_game'):.2f}")
+                    st.write(f"Key Pass/Game: {detail.get('key_pass_per_game'):.2f}")
+                    st.write(f"Long Ball Pass/Game: {detail.get('long_ball_per_game'):.2f}")
+                    st.write(f"Successful Crossing/Game: {detail.get('successful_crossing_per_game'):.2f}")
 
                 with col5:
-                    st.write(f"Ball recovered per game: {detail.get('ball_recovered_per_game'):.2f}")
-                    st.write(f"Dribbled past per game: {detail.get('dribbled_past_per_game'):.2f}")
-                    st.write(f"Clearance per game: {detail.get('clearance_per_game'):.2f}")
-                    st.write(f"Error leading to shot per game: {detail.get('error_per_game'):.2f}")
-                    st.write(f"Total duel won per game: {detail.get('total_duel_per_game'):.2f}")
-                    st.write(f"Aerial duel won per game: {detail.get('aerial_duel_per_game'):.2f}")
+                    st.write(f"Ball Recovered/Game: {detail.get('ball_recovered_per_game'):.2f}")
+                    st.write(f"Dribbled Past/Game: {detail.get('dribbled_past_per_game'):.2f}")
+                    st.write(f"Clearance/Game: {detail.get('clearance_per_game'):.2f}")
+                    st.write(f"Error Leading to Shot: {detail.get('error')}")
+                    st.write(f"Total Duel Won/Game: {detail.get('total_duel_per_game'):.2f}")
+                    st.write(f"Aerial Duel Won/Game: {detail.get('aerial_duel_per_game'):.2f}")
 
                 st.markdown("---")
                 st.subheader("Pemain Rekomendasi")
@@ -317,30 +316,121 @@ elif page == "Analisis":
                     step=1
                 )
 
-                only_indo = st.checkbox("Pemain Indonesia saja", value=False)
+                col7, col8, col9, col10 = st.columns(4)
+
+                with col7:
+                    only_indo = st.checkbox("Pemain Indonesia saja", value=False)
+
+                with col8:
+                    filter_position = st.checkbox("Posisi yang sama saja", value=False)
                 
-                if recommend_count and st.button("Cari pemain rekomendasi"):
-                    try:
-                        recs = get_recommend_similar_players(
-                            season=selected_season,
-                            position_code=selected_position,   # "ST", "CM", ...
-                            anchor_player=selected_player,
-                            top_n=recommend_count,
-                            only_indonesian=only_indo,
-                        )
-                        if recs.empty:
-                            st.info("Tidak ada rekomendasi yang cocok untuk konfigurasi ini.")
-                        else:
-                            # tampilkan tabel ringkas
-                            cols_show = ["player", "team", "position", "nationality", "similarity"]
-                            cols_show = [c for c in cols_show if c in recs.columns]
-                            st.dataframe(
-                                recs[cols_show].assign(similarity=lambda d: d["similarity"].round(4)),                                
-                            )
-                    except Exception as e:
-                        st.error(f"Gagal mencari rekomendasi: {e}")
+                if recommend_count and st.button("Cari pemain rekomendasi"):                    
+                    recs = get_recommend_similar_players(
+                        season=selected_season,
+                        position_code=selected_position,
+                        anchor_player=selected_player,
+                        top_n=recommend_count,
+                        only_indonesian=only_indo,
+                        filter_position=filter_position
+                    )
+                    st.session_state["recs_df"] = recs
+                    st.session_state["feat_df"] = get_player_features_df(selected_season)
+                    st.session_state["cmp_target"] = None
 
+                    if recs.empty:
+                        st.info("Tidak ada pemain rekomendasi yang cocok untuk konfigurasi ini.")
+                        st.session_state["recs_df"] = None
+                        st.session_state["feat_df"] = None
+                        st.session_state["cmp_target"] = None
+                  
+                import altair as alt
 
+                FEATURES_TO_COMPARE = [
+                    # isi sesuai kolom fitur kamu, contoh:
+                    "age", "appearance", "total_minute",
+                    "total_goal", "assist", "shot_per_game",
+                    # "tackles_p90", "interceptions_p90", "carries_p90"
+                ]
+
+                recs_df = st.session_state.get("recs_df")
+                feat_df = st.session_state.get("feat_df")
+
+                if recs_df is not None and not recs_df.empty:
+                    # ====== header kolom ======
+                    col_head1, col_head2, col_head3, col_head4, col_head5, col_head6 = st.columns([3, 3, 2, 2, 2, 2])
+                    col_head1.write("**Pemain**")
+                    col_head2.write("**Tim**")
+                    col_head3.write("**Posisi**")
+                    col_head4.write("**Nationality**")
+                    col_head5.write("**Kemiripan**")
+                    # col_head6.write("**Aksi**")
+
+                    cols_show = ["player", "team", "position", "nationality", "similarity"]
+                    cols_show = [c for c in cols_show if c in recs_df.columns]
+
+                    for i, ds in recs_df[cols_show].iterrows():
+                        col1, col2, col3, col4, col5, col6 = st.columns([3, 3, 2, 2, 2, 2])
+
+                        sim_pct = float(ds.get("similarity", 0.0))
+                        sim_pct = max(0.0, min(1.0, sim_pct)) * 100.0  
+
+                        col1.write(ds.get("player", "-"))
+                        col2.write(ds.get("team", "-"))
+                        col3.write(ds.get("position", "-"))
+                        col4.write(ds.get("nationality", "-"))
+                        col5.write(f"{sim_pct:.2f}%")
+
+                        # tombol bandingkan per baris
+                        if col6.button("Bandingkan", key=f"cmp_{i}_{ds.get('player','')}"):
+                            st.session_state["cmp_target"] = ds['player']
+
+                    if st.session_state.get("cmp_target"):
+                        target_player = st.session_state["cmp_target"]
+                        with st.expander(f"Perbandingan {selected_player} dengan {target_player}", expanded=True):                                
+                            try:
+                                long_df = prepare_comparison_long_df(
+                                    feat_df=feat_df,
+                                    anchor_player=selected_player,
+                                    target_player=target_player,
+                                    features=FEATURES_TO_COMPARE
+                                )
+                            except ValueError as e:
+                                st.error(str(e))
+                            else:
+                                # expander tepat di bawah baris ini
+                                if not FEATURES_TO_COMPARE:
+                                    st.warning("Daftar fitur kosong. Isi `FEATURES_TO_COMPARE` dulu.")
+                                else:
+                                    # render bar chart per-fitur dalam kolom (mis. 3 kolom per baris)
+                                    N_COLS = 2
+                                    fitur_list = list(long_df["Fitur"].unique())
+                                    for start in range(0, len(fitur_list), N_COLS):
+                                        cols_plot = st.columns(N_COLS)
+                                        batch = fitur_list[start:start+N_COLS]
+                                        for c, fitur in zip(cols_plot, batch):
+                                            sub = long_df[long_df["Fitur"] == fitur]
+                                            chart = (
+                                                alt.Chart(sub)
+                                                .mark_bar()
+                                                .encode(
+                                                    x=alt.X("Pemain:N", axis=alt.Axis(title=None, labelAngle=0)),
+                                                    y=alt.Y("Nilai:Q", axis=alt.Axis(title=None)),
+                                                    tooltip=["Pemain:N", "Nilai:Q"]
+                                                )
+                                                .properties(
+                                                    title={
+                                                        "text": str(fitur),
+                                                        "anchor": "middle",
+                                                        "align": "center",                                                        
+                                                    },                                                    
+                                                    width="container", 
+                                                    height=220
+                                                )
+                                            )
+                                            with c:
+                                                st.altair_chart(chart, use_container_width=True)
+                # else:
+                #     st.info("Klik **Cari pemain rekomendasi**.")
 elif page == "About":
     st.header("About")
     st.write("Lorem ipsum dolor sit amet, consectetur adipiscing elit…")

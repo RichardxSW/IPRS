@@ -1,15 +1,11 @@
 # players/services.py
 from __future__ import annotations
 from typing import List
-import numpy as np
 import pandas as pd
 from django.db import transaction
-
-from players.clustering import POS_GROUPS, run_meanshift_by_position
 from .models import Dataset, Player
 from django.db.models import Count
 from django.core.exceptions import ValidationError
-from sklearn.metrics.pairwise import cosine_similarity
 
 
 def get_required(row, cols, key, as_str=False):
@@ -117,7 +113,7 @@ def get_players_by_season(season: str, position: str) -> List[str]:
         Player.objects.filter(
             dataset__season=season, 
             position__icontains=position,
-        ).exclude(nationality="Indonesia").order_by("player").values_list("player", flat=True)
+        ).order_by("player").values_list("player", flat=True)
     )
     print(len(players))
     return players
@@ -203,68 +199,4 @@ def delete_dataset(dataset_id: int) -> bool:
     deleted, _ = Dataset.objects.filter(id=dataset_id).delete()
     return deleted > 0
 
-def _group_for_position(pos_code: str) -> str | None:
-    p = str(pos_code).upper().strip()
-    for g, arr in POS_GROUPS.items():
-        if p in arr:
-            return g
-    return None
 
-def get_recommend_similar_players(
-    season: str,
-    position_code: str,
-    anchor_player: str,
-    top_n: int = 5,
-    only_indonesian: bool = False,
-):
-    """
-    Rekomendasi berbasis cosine:
-    - pakai grup sesuai position_code,
-    - pakai konfigurasi cluster dengan silhouette terbaik,
-    - top-N dari cluster yang sama dengan anchor.
-    """
-    group = _group_for_position(position_code)
-    if not group:
-        raise ValueError("Kode posisi tidak valid.")
-
-    all_results = run_meanshift_by_position(season)
-    res = all_results.get(group)
-    if not res or not res.get("best_sil"):
-        return pd.DataFrame()  # tidak ada model valid untuk grup ini
-
-    labels = res["best_sil"]["labels"]
-    Xs = res["Xs"]
-    meta = res["meta"].copy()  # id, player, team, position, nationality, ...
-
-    # cari index anchor (case-insensitive)
-    anchor_mask = meta["player"].str.lower() == str(anchor_player).lower()
-    if not anchor_mask.any():
-        return pd.DataFrame()  # anchor tidak ditemukan di grup
-
-    anchor_idx = int(meta[anchor_mask].index[0])
-    anchor_cluster = int(labels[anchor_idx])
-
-    # ambil hanya pemain dalam cluster yang sama
-    same_idx = np.where(labels == anchor_cluster)[0]
-    if same_idx.size <= 1:
-        return pd.DataFrame()  # cluster cuma anchor sendiri
-
-    # filter “Pemain Indonesia saja” jika diminta
-    if "nationality" in meta.columns and only_indonesian:
-        same_idx = [i for i in same_idx if str(meta.loc[i, "nationality"]).strip().lower() == "indonesia"]
-        if len(same_idx) <= 1:
-            return pd.DataFrame()
-
-    # hitung cosine similarity antara anchor vs anggota cluster
-    anchor_vec = Xs[anchor_idx:anchor_idx+1, :]
-    cluster_vecs = Xs[same_idx, :]
-    sims = cosine_similarity(anchor_vec, cluster_vecs).ravel()
-
-    out = meta.iloc[same_idx].copy()
-    out["similarity"] = sims
-    # buang baris anchor sendiri
-    out = out[out.index != anchor_idx]
-    out = out.sort_values("similarity", ascending=False).head(top_n)
-
-    # bisa tambahkan beberapa kolom fitur penting sebagai konteks
-    return out.reset_index(drop=True)

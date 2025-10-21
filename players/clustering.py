@@ -1,7 +1,7 @@
 # players/services.py
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, normalize
 from sklearn.decomposition import PCA
 from sklearn.cluster import MeanShift
 from sklearn.metrics import silhouette_score, davies_bouldin_score
@@ -35,7 +35,7 @@ FEATURES_BY_POS = {
 }
 
 META_COLS = [
-    "id", "player", "team", "position",
+    "id", "player", "team", "position", "nationality",
     "age", "appearance", "total_minute",
     "total_goal", "assist", "error"
 ]
