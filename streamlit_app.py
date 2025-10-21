@@ -324,7 +324,8 @@ elif page == "Analisis":
                 with col8:
                     filter_position = st.checkbox("Posisi yang sama saja", value=False)
                 
-                if recommend_count and st.button("Cari pemain rekomendasi"):                    
+                if recommend_count and st.button("Cari pemain rekomendasi") and (selected_season or selected_player or selected_position):
+                    st.subheader("Hasil Pemain Rekomendasi")
                     recs = get_recommend_similar_players(
                         season=selected_season,
                         position_code=selected_position,
@@ -342,7 +343,11 @@ elif page == "Analisis":
                         st.session_state["recs_df"] = None
                         st.session_state["feat_df"] = None
                         st.session_state["cmp_target"] = None
-                  
+                else:
+                    st.session_state["recs_df"] = None
+                    st.session_state["feat_df"] = None
+                    st.session_state["cmp_target"] = None
+                                      
                 import altair as alt
 
                 FEATURES_TO_COMPARE = [

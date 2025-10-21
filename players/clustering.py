@@ -11,23 +11,23 @@ from .models import Player
 # DEFINISI POSISI & FITUR
 # =============================
 POS_GROUPS = {
-    "Forward": ["ST", "LW", "RW"],
-    "Midfielder": ["AM", "CM", "DM", "LM", "RM"],
-    "Defender": ["CB", "LB", "RB"],
+    "Pemain Penyerang": ["ST", "LW", "RW"],
+    "Pemain Gelandang": ["AM", "CM", "DM", "LM", "RM"],
+    "Pemain Bertahan": ["CB", "LB", "RB"],
 }
 
 FEATURES_BY_POS = {
-    "Forward": [
+    "Pemain Penyerang": [
         "goal_per_game", "shot_per_game", "sot_per_game",
         "assist_per_game", "successful_dribble_per_game", "successful_crossing_per_game",
         "key_pass_per_game", "total_duel_per_game", "aerial_duel_per_game"
     ],
-    "Midfielder": [
+    "Pemain Gelandang": [
         "shot_per_game", "sot_per_game", "assist_per_game", "key_pass_per_game", "successful_pass_per_game",
         "long_ball_per_game", "successful_dribble_per_game",
         "ball_recovered_per_game", "total_duel_per_game", "dribbled_past_per_game", "clearance_per_game"
     ],
-    "Defender": [
+    "Pemain Bertahan": [
         "clearance_per_game", "ball_recovered_per_game",
         "dribbled_past_per_game", "successful_dribble_per_game",
         "long_ball_per_game", "aerial_duel_per_game", "total_duel_per_game"
@@ -78,7 +78,7 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
 
     for bw in bandwidths:
         labels, n_clusters, = None, 0
-        for bin_seed in (True, False):
+        for bin_seed in [True]:
             try:
                 ms = MeanShift(bandwidth=float(bw), bin_seeding=bin_seed, cluster_all=True)
                 labels = ms.fit_predict(Xs)
