@@ -23,14 +23,14 @@ FEATURES_BY_POS = {
         "key_pass_per_game", "total_duel_per_game", "aerial_duel_per_game"
     ],
     "Pemain Gelandang": [
-        "shot_per_game", "sot_per_game", "assist_per_game", "key_pass_per_game", "successful_pass_per_game",
-        "long_ball_per_game", "successful_dribble_per_game",
+        "goal_per_game", "shot_per_game", "sot_per_game", "assist_per_game", "key_pass_per_game", "successful_pass_per_game",
+        "long_ball_per_game", "successful_dribble_per_game", "aerial_duel_per_game", "successful_crossing_per_game",
         "ball_recovered_per_game", "total_duel_per_game", "dribbled_past_per_game", "clearance_per_game"
     ],
     "Pemain Bertahan": [
         "clearance_per_game", "ball_recovered_per_game",
         "dribbled_past_per_game", "successful_dribble_per_game",
-        "long_ball_per_game", "aerial_duel_per_game", "total_duel_per_game"
+        "aerial_duel_per_game", "total_duel_per_game"
     ],
 }
 
@@ -39,6 +39,29 @@ META_COLS = [
     "age", "appearance", "total_minute",
     "total_goal", "assist", "error"
 ]
+
+FEATURE_LABELS = {
+    "age": "Age",
+    "appearance": "Appearances",
+    "total_minute": "Total Minutes Played",
+    "clearance_per_game": "Clearance/Game",
+    "ball_recovered_per_game": "Ball Recovery/Game",    
+    "aerial_duel_per_game": "Aerial Duel/Game",
+    "total_duel_per_game": "Total Duel/Game",
+    "successful_pass_per_game": "Successful Pass/Game",
+    "long_ball_per_game": "Long Pass/Game",
+    "dribbled_past_per_game": "Dribbled Past/Game",    
+    "successful_dribble_per_game": "Successful Dribble/Game",
+    "total_goal": "Goals",
+    "goal_per_game": "Goal/Game",
+    "assist_per_game": "Assist/Game",
+    "assist": "Assists",
+    "shot_per_game": "Shot/Game",
+    "sot_per_game": "Shot on Target/Game",
+    "key_pass_per_game": "Key Pass/Game",
+    "successful_crossing_per_game": "Successful Crossing/Game",
+    "error": "Error Leading to Shot"
+}
 
 # =============================
 # UTILITAS
@@ -124,6 +147,7 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
         "emb2d": X2,
         "Xs": Xs,
         "meta": df.reset_index(drop=True),
+        "feature_df": df[feat_cols].reset_index(drop=True),
         "best_sil": best_sil,
         "best_dbi": best_dbi,
         "same_bw": same_bw,

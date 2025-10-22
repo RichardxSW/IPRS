@@ -6,6 +6,17 @@ from players.clustering import POS_GROUPS, run_meanshift_by_position
 from sklearn.metrics.pairwise import cosine_similarity
 
 
+FEATURES_TO_COMPARE = [
+    # isi sesuai kolom fitur kamu, contoh:
+    "age", "appearance", "total_minute",
+    "total_goal", "assist", "shot_per_game",
+    "sot_per_game", "successful_dribble_per_game", "key_pass_per_game",
+    "successful_pass_per_game", "long_ball_per_game", "successful_crossing_per_game",
+    "ball_recovered_per_game", "dribbled_past_per_game", "clearance_per_game",
+    "error", "total_duel_per_game", "aerial_duel_per_game"
+    # "tackles_p90", "interceptions_p90", "carries_p90"
+]
+
 def _group_for_position(pos_code: str) -> str | None:
     p = str(pos_code).upper().strip()
     for g, arr in POS_GROUPS.items():
