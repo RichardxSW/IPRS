@@ -61,14 +61,14 @@ for label, target in col_map.items():
 page = st.session_state.page
 
 # =========================
-# PAGES
+# BERANDA
 # =========================
 if page == "Beranda":
     st.title("Sistem Rekomendasi Pemain Sepak Bola Indonesia")
     st.markdown(
         """
         ---
-        ### 🧭 Panduan Penggunaan
+        ### 🧭 Fitur yang terdapat di website ini
         1. **Unggah Dataset** → Masukkan data liga dan pemain yang ingin dianalisis.  
         2. **Analisis** → Pilih musim, lakukan clustering, dan temukan pemain rekomendasi.  
         3. **About** → Lihat lebih lanjut tentang website dan pembuat.  
@@ -76,6 +76,7 @@ if page == "Beranda":
         """
     )
 
+# UNGGAH DATASET
 elif page == "Unggah Dataset":
     st.header("Template Dataset")
 
@@ -176,6 +177,7 @@ elif page == "Unggah Dataset":
                 else:
                     st.error("Gagal menghapus data liga.")
 
+# ANALISIS
 elif page == "Analisis":
     st.header("Analisis")
 
@@ -435,7 +437,7 @@ elif page == "Analisis":
                 recommend_count = st.slider(
                     "Jumlah pemain rekomendasi",
                     min_value=1,
-                    max_value=5,
+                    max_value=10,
                     step=1
                 )
 
@@ -548,6 +550,8 @@ elif page == "Analisis":
                                                 st.altair_chart(chart)
                 # else:
                 #     st.info("Klik **Cari pemain rekomendasi**.")
+
+# ABOUT
 elif page == "About":
     st.header("About")
 

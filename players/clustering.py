@@ -1,7 +1,7 @@
 # players/services.py
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import StandardScaler, normalize
+from sklearn.preprocessing import StandardScaler, normalize, RobustScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import MeanShift
 from sklearn.metrics import silhouette_score, davies_bouldin_score

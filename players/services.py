@@ -1,4 +1,3 @@
-# players/services.py
 from __future__ import annotations
 from typing import List
 import pandas as pd
@@ -6,8 +5,10 @@ from django.db import transaction
 from .models import Dataset, Player
 from django.db.models import Count
 from django.core.exceptions import ValidationError
+import io
 
 
+#VALIDASI DATASET
 def get_required(row, cols, key, as_str=False):
     """Ambil nilai dari kolom. Raise Exception jika kolom tidak ditemukan."""
     if key not in cols:
@@ -19,6 +20,7 @@ def get_required(row, cols, key, as_str=False):
     return str(val).strip() if as_str else val
 
 
+# POST DATASET KE DATABASE
 @transaction.atomic
 def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) -> int:
     """
@@ -103,11 +105,13 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
         Player.objects.bulk_create(bulk, batch_size=1000)
     return ds.id
 
+# BACA DATA MUSIM
 def get_seasons() -> List[str]:
     return list(
         Dataset.objects.values_list("season", flat=True).distinct().order_by("season")
     )
 
+# BACA DATA PEMAIN
 def get_players_by_season(season: str, position: str) -> List[str]:
     players = list(
         Player.objects.filter(
@@ -118,10 +122,7 @@ def get_players_by_season(season: str, position: str) -> List[str]:
     print(len(players))
     return players
 
-# utils/files.py
-import io
-from datetime import datetime
-
+# DOWNLOAD TEMPLATE DATASET
 def make_template_excel_bytes() -> bytes:
     template = pd.DataFrame({
         "Player": ["Marc Klok", ""],
