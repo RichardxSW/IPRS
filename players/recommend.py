@@ -5,18 +5,17 @@ import pandas as pd
 from players.clustering import POS_GROUPS, run_meanshift_by_position
 from sklearn.metrics.pairwise import cosine_similarity
 
-
+# FITUR YANG AKAN DITAMPILKAN DALAM HASIL PERBANDINGAN
 FEATURES_TO_COMPARE = [
-    # isi sesuai kolom fitur kamu, contoh:
     "age", "appearance", "total_minute",
     "total_goal", "assist", "shot_per_game",
     "sot_per_game", "successful_dribble_per_game", "key_pass_per_game",
     "successful_pass_per_game", "long_ball_per_game", "successful_crossing_per_game",
     "ball_recovered_per_game", "dribbled_past_per_game", "clearance_per_game",
     "error", "total_duel_per_game", "aerial_duel_per_game"
-    # "tackles_p90", "interceptions_p90", "carries_p90"
 ]
 
+# MENGKATEGORIKAN POSISI KE PENYERANG, GELANDANG ATAU BERTAHAN
 def _group_for_position(pos_code: str) -> str | None:
     p = str(pos_code).upper().strip()
     for g, arr in POS_GROUPS.items():
@@ -25,7 +24,7 @@ def _group_for_position(pos_code: str) -> str | None:
     return None
 
 def _pos_tokens(pos_str) -> set[str]:
-    """Ubah string posisi jadi set token huruf besar (tahan spasi, /, -, koma, dll)."""
+    """Ubah string posisi jadi set token huruf besar (spasi, /, -, koma, dll)."""
     if pos_str is None:
         return set()
     if isinstance(pos_str, float) and math.isnan(pos_str):
@@ -34,11 +33,13 @@ def _pos_tokens(pos_str) -> set[str]:
     tokens = [t for t in re.split(r"[^A-Z]+", s) if t]
     return set(tokens)
 
+# FILTER POSISI
 def _matches_position(pos_str: str, anchor_tokens: set[str]) -> bool:
     """True kalau ada minimal satu token posisi yang sama dengan anchor."""
     tokens = _pos_tokens(pos_str)
     return bool(tokens & anchor_tokens)
 
+# MENCARI PEMAIN REKOMENDASI DAN MENGHITUNG COSINE SIMILARITY
 def get_recommend_similar_players(
     season: str,
     position_code: str,
@@ -90,6 +91,7 @@ def get_recommend_similar_players(
     # if "position" in meta.columns and filter_position:
     #     same_idx = [j for j in same_idx if str(meta.loc[j, "position"]).strip() == position_code]
 
+    # FILTER POSISI YANG SAMA DENGAN PEMAIN ACUAN
     if "position" in meta.columns and filter_position:
         same_idx = [j for j in same_idx if _matches_position(meta.loc[j, "position"], anchor_tokens)]
 
@@ -106,6 +108,7 @@ def get_recommend_similar_players(
 
     return out.reset_index(drop=True)
 
+# MEMBACA FITUR UNTUK YANG DIPAKAI UNTUK PEMAIN ACUAN DAN PEMAIN REKOMENDASI
 def get_feature_rows(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> tuple[pd.Series, pd.Series]:
     """
     Ambil baris fitur untuk anchor & target. Raise ValueError jika tidak ada.
@@ -132,6 +135,7 @@ def build_long_compare_df(anchor_row: pd.Series, target_row: pd.Series, features
     long_df = df.melt(id_vars="Fitur", var_name="Pemain", value_name="Nilai")
     return long_df
 
+# UNTUK MEMBUAT CHART PERBANDINGAN
 def prepare_comparison_long_df(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> pd.DataFrame:
     """
     Satu pintu: ambil baris → bentuk long-form → kembalikan ke UI.

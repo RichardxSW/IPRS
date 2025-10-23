@@ -9,16 +9,14 @@ import altair as alt
 
 from players.bar_chart import BarDataMissing, build_cluster_feature_bar_df, get_features_for_group
 
-# === Bootstrap Django ===
+# === INIT DJANGO
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
-
 import django
 django.setup()
 
 from players.clustering import FEATURE_LABELS, FEATURES_BY_POS, get_player_features_df, run_meanshift, run_meanshift_by_position
-# === Import services & utils ===
 from players.services import (
     delete_dataset, get_list_of_dataset, get_player_detail, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
 )
@@ -26,7 +24,7 @@ from players.recommend import FEATURES_TO_COMPARE, get_recommend_similar_players
 
 st.set_page_config(page_title="IPRS", layout="wide")
 
-# ====== Style ======
+# ====== STYLE ======
 st.markdown(
     """
         <style>
@@ -42,7 +40,7 @@ st.markdown(
 )
 
 # =========================
-# NAVIGASI SIDEBAR (BUTTON)
+# SIDEBAR
 # =========================
 st.sidebar.title("IPRS")
 if "page" not in st.session_state:
@@ -54,6 +52,7 @@ col_map = {
     "📊 Analisis": "Analisis",
     "ℹ️ About": "About",
 }
+
 for label, target in col_map.items():
     if st.sidebar.button(label):
         st.session_state.page = target
@@ -80,6 +79,7 @@ if page == "Beranda":
 elif page == "Unggah Dataset":
     st.header("Template Dataset")
 
+    # TEMPLATE DATA
     data = {
         "Player": ["Marc Klok", ""],
         "Team": ["Persib Bandung", ""],
@@ -108,6 +108,7 @@ elif page == "Unggah Dataset":
         "Aerial duel won/game": [5, ""],
     }
 
+# DOWNLOAD FILE TEMPLATE DATASET
     df = pd.DataFrame(data)
     st.dataframe(df)
     st.download_button(
@@ -117,6 +118,7 @@ elif page == "Unggah Dataset":
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
+# UPLOAD FILE DATASET
     st.markdown("---")
     st.header("Unggah Dataset")
     with st.form("upload_form"):
@@ -127,6 +129,7 @@ elif page == "Unggah Dataset":
 
     if submitted:
         try:
+            # VALIDASI DATA
             if not league_name:
                 st.error("Isi nama liga terlebih dahulu.")
             if not season:
@@ -154,12 +157,12 @@ elif page == "Unggah Dataset":
     if not datasets:
         st.info("Belum ada data yang tersimpan")
     else:
+        # DATA MUSIM YANG SUDAH DIUNGGAH
         col_head1, col_head2, col_head3, col_head4, col_head5 = st.columns([3, 2, 2, 2, 2])
         col_head1.write("**Liga**")
         col_head2.write("**Musim**")
         col_head3.write("**Jumlah Pemain**")
         col_head4.write("**Diunggah**")
-        # col_head5.write("**Hapus**")
 
         for ds in datasets:
             col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
@@ -168,7 +171,6 @@ elif page == "Unggah Dataset":
             col3.write(ds["player_count"])
             col4.write(pd.to_datetime(ds["uploaded_at"]).strftime("%d-%m-%Y %H:%M"))
 
-            # if col5.button("🗑️", key=f"del_{ds['id']}"):
             if col5.button("Hapus", key=f"del_{ds['id']}"):
                 ok = delete_dataset(ds["id"])
                 if ok:
@@ -181,11 +183,11 @@ elif page == "Unggah Dataset":
 elif page == "Analisis":
     st.header("Analisis")
 
-    # ==== helpers reset state (letakkan setelah st.header("Analisis")) ====
+    # ==== HELPER UNTUK RESET STATE ====
     st.session_state.setdefault("recs_df", None)
     st.session_state.setdefault("feat_df", None)
     st.session_state.setdefault("cmp_target", None)
-    st.session_state.setdefault("cluster_result", None)  # konsisten pakai singular
+    st.session_state.setdefault("cluster_result", None)
     st.session_state.setdefault("selected_season", None)
 
     def _clear_reco_state():
@@ -195,12 +197,13 @@ elif page == "Analisis":
 
     def _clear_cluster_state():
         st.session_state["cluster_result"] = None
-        st.session_state["selected_season"] = None  # penanda musim untuk hasil cluster
+        st.session_state["selected_season"] = None
 
     seasons = get_seasons()
     if not seasons:
         st.warning("Belum ada data liga yang diunggah. Unggah dataset terlebih dahulu di halaman Unggah Dataset.")
     else:
+        # DROPDOWN PILIH MUSIM
         season_choices = ["Pilih Musim"] + seasons
         selected_season = st.selectbox("Pilih Musim", season_choices, index=0)
 
@@ -216,6 +219,7 @@ elif page == "Analisis":
                 st.session_state.selected_season = selected_season                
                 st.success("Clustering berhasil.")
 
+        # HASIL CLUSTERING
         results = st.session_state.get("cluster_result")
         if results and st.session_state.get("selected_season") == selected_season:
             with st.expander("Hasil Clustering"):
@@ -243,10 +247,10 @@ elif page == "Analisis":
                                 continue
 
                             df_eval = res["res_table"]
-                            X2 = res["emb2d"]
+                            X2 = res["pca"]
                             best = res["best_sil"]
 
-                            # tabel ringkasan
+                            # tabel hasil loop clustering dengan bandwidth
                             if best:
                                 st.caption(
                                     f"BW={best['bw']:.1f} | Clusters={best['n_clusters']} | "
@@ -260,11 +264,12 @@ elif page == "Analisis":
                                     height=180
                                 )
 
-                            # scatter
+                            # menampilkan scatter plot nilai silhouette terbaik
                             if best and X2 is not None:
+                                st.write("Nilai Silhouette Terbaik")
                                 plot_clusters(X2, best["labels"], f"{group_name}")
 
-                            # bar chart tiap fitur
+                            # init bar chart tiap fitur
                             try:
                                 feature_cols = get_features_for_group(group_name, FEATURES_BY_POS)
                                 bar_long = build_cluster_feature_bar_df(res, feature_cols)
@@ -279,7 +284,7 @@ elif page == "Analisis":
                                 clusters_order = sorted(bar_long["Cluster"].unique(), key=lambda s: int(s[1:]))  # "C0","C1",...
                                 bar_long["Cluster"] = pd.Categorical(bar_long["Cluster"], categories=clusters_order, ordered=True)
 
-                                # tampilkan tiap fitur satu chart di bawah
+                                # tampilkan tiap fitur satu bar chart
                                 for fitur in feature_cols:
                                     sub = bar_long[bar_long["Fitur"] == fitur]
                                     chart_title = FEATURE_LABELS.get(fitur, fitur)
@@ -303,14 +308,7 @@ elif page == "Analisis":
                                     )
                                     st.altair_chart(chart)
 
-                    # DBI terbaik (jika beda bandwidth)
-                    # if res["best_dbi"] and not res["same_bw"]:
-                    #     b = res["best_dbi"]
-                    #     st.markdown("#### DBI Terbaik")
-                    #     st.caption(f"bw={b['bw']:.2f}, clusters={b['n_clusters']}, dbi={b['dbi']:.4f}, silhouette={b['sil']}")
-                    #     plot_clusters(X2, b["labels"], f"{group_name} – DBI Terbaik (bw={b['bw']:.2f})")
-
-                if st.button("🔄 Reset Hasil"):
+                if st.button("🔄 Reset Hasil Clustering"):
                     _clear_reco_state()
                     _clear_cluster_state()
                     st.rerun()
@@ -379,26 +377,26 @@ elif page == "Analisis":
         st.session_state["prev_position"] = selected_position
         st.session_state["prev_anchor"]   = selected_player
         # -------------------------------------------------------------------------
-
-        # st.markdown("---")
+        
+        # DETAIL PEMAIN ACUAN
         if selected_season and selected_position and selected_player:
             detail = get_player_detail(selected_season, selected_player)
 
             if detail:
                 st.subheader("Tentang Pemain")
                 # st.write(f"**Musim**: {selected_season}")
-                # st.write(f"**Pemain**: {selected_player}")
+                st.write(f"Pemain: **{selected_player}**")
                 col1, col2 = st.columns(2)
 
                 with col1:
-                    st.write(f"Team: {detail.get('team')}")
-                    st.write(f"Nationality: {detail.get('nationality')}")
-                    st.write(f"Position: {detail.get('position')}")
+                    st.write(f"Team: **{detail.get('team')}**")
+                    st.write(f"Nationality: **{detail.get('nationality')}**")
+                    st.write(f"Position: **{detail.get('position')}**")
 
                 with col2:
-                    st.write(f"Age: {detail.get('age')}")
-                    st.write(f"Appearance: {detail.get('appearance')}")
-                    st.write(f"Total minutes played: {detail.get('total_minute')}")
+                    st.write(f"Age: **{detail.get('age')}**")
+                    st.write(f"Appearance: **{detail.get('appearance')}**")
+                    st.write(f"Total Minutes Played: **{detail.get('total_minute')}**")
 
                 st.markdown("---")
                 st.subheader("Statistik Pemain Acuan")
@@ -406,30 +404,29 @@ elif page == "Analisis":
                 col3, col4, col5 = st.columns(3)
 
                 with col3:
-                    st.write(f"Total Goal: {detail.get('total_goal')}")
-                    st.write(f"Total Assist: {detail.get('assist')}")
-                    st.write(f"Shot/Game: {detail.get('shot_per_game'):.2f}")
-                    st.write(f"Shot On Target/Game: {detail.get('sot_per_game'):.2f}")
-                    st.write(f"Successful Dribble/game: {detail.get('successful_dribble_per_game'):.2f}")
+                    st.write(f"Total Goal: **{detail.get('total_goal')}**")
+                    st.write(f"Total Assist: **{detail.get('assist')}**")
+                    st.write(f"Shot/Game: **{detail.get('shot_per_game'):.2f}**")
+                    st.write(f"Shot On Target/Game: **{detail.get('sot_per_game'):.2f}**")
+                    st.write(f"Successful Dribble/Game: **{detail.get('successful_dribble_per_game'):.2f}**")
 
                 with col4:
-                    st.write(f"Successful Pass/Game: {detail.get('successful_pass_per_game'):.2f}")
-                    st.write(f"Key Pass/Game: {detail.get('key_pass_per_game'):.2f}")
-                    st.write(f"Long Ball Pass/Game: {detail.get('long_ball_per_game'):.2f}")
-                    st.write(f"Successful Crossing/Game: {detail.get('successful_crossing_per_game'):.2f}")
+                    st.write(f"Successful Pass/Game: **{detail.get('successful_pass_per_game'):.2f}**")
+                    st.write(f"Key Pass/Game: **{detail.get('key_pass_per_game'):.2f}**")
+                    st.write(f"Long Ball Pass/Game: **{detail.get('long_ball_per_game'):.2f}**")
+                    st.write(f"Successful Crossing/Game: **{detail.get('successful_crossing_per_game'):.2f}**")
 
                 with col5:
-                    st.write(f"Ball Recovered/Game: {detail.get('ball_recovered_per_game'):.2f}")
-                    st.write(f"Dribbled Past/Game: {detail.get('dribbled_past_per_game'):.2f}")
-                    st.write(f"Clearance/Game: {detail.get('clearance_per_game'):.2f}")
-                    st.write(f"Error Leading to Shot: {detail.get('error')}")
-                    st.write(f"Total Duel Won/Game: {detail.get('total_duel_per_game'):.2f}")
-                    st.write(f"Aerial Duel Won/Game: {detail.get('aerial_duel_per_game'):.2f}")
+                    st.write(f"Ball Recovered/Game: **{detail.get('ball_recovered_per_game'):.2f}**")
+                    st.write(f"Dribbled Past/Game: **{detail.get('dribbled_past_per_game'):.2f}**")
+                    st.write(f"Clearance/Game: **{detail.get('clearance_per_game'):.2f}**")
+                    st.write(f"Error Leading to Shot: **{detail.get('error')}**")
+                    st.write(f"Total Duel Won/Game: **{detail.get('total_duel_per_game'):.2f}**")
+                    st.write(f"Aerial Duel Won/Game: **{detail.get('aerial_duel_per_game'):.2f}**")
 
                 st.markdown("---")
                 st.subheader("Pemain Rekomendasi")
                 
-                # --------- init session state aman ----------
                 st.session_state.setdefault("recs_df", None)
                 st.session_state.setdefault("feat_df", None)
                 st.session_state.setdefault("cmp_target", None)
@@ -472,8 +469,8 @@ elif page == "Analisis":
                 recs_df = st.session_state.get("recs_df")
                 feat_df = st.session_state.get("feat_df")
 
+                # DAFTAR PEMAIN REKOMENDASI
                 if recs_df is not None and isinstance(recs_df, pd.DataFrame) and not recs_df.empty:
-                    # ====== header kolom ======
                     st.subheader("Hasil Pemain Rekomendasi")
                     col_head1, col_head2, col_head3, col_head4, col_head5, col_head6 = st.columns([3, 3, 2, 2, 2, 2])
                     col_head1.write("**Pemain**")
@@ -498,7 +495,7 @@ elif page == "Analisis":
                         col4.write(ds.get("nationality", "-"))
                         col5.write(f"{sim_pct:.2f}%")
 
-                        # tombol bandingkan per baris
+                        # BUTTON BANDINGKAN PER PEMAIN
                         if col6.button("Bandingkan", key=f"cmp_{i}_{ds.get('player','')}"):
                             st.session_state["cmp_target"] = ds['player']
                     
@@ -548,8 +545,6 @@ elif page == "Analisis":
                                             )
                                             with c:
                                                 st.altair_chart(chart)
-                # else:
-                #     st.info("Klik **Cari pemain rekomendasi**.")
 
 # ABOUT
 elif page == "About":

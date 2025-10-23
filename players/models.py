@@ -12,7 +12,7 @@ class Test(models.Model):
     def __str__(self):
         return f"{self.tes}"
     
-
+# MODEL UNTUK DATA MUSIM
 class Dataset(models.Model):
     league_name=models.CharField(max_length=50)
     season=models.CharField(max_length=50)
@@ -25,7 +25,7 @@ class Dataset(models.Model):
     def __str__(self):
         return f"{self.league_name} ({self.season})"
     
-
+# MODEL UNTUK DATA PEMAIN
 class Player(models.Model):
     dataset=models.ForeignKey(Dataset, on_delete=models.CASCADE, related_name='players')
     player=models.CharField(max_length=100)

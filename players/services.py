@@ -23,14 +23,10 @@ def get_required(row, cols, key, as_str=False):
 # POST DATASET KE DATABASE
 @transaction.atomic
 def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) -> int:
-    """
-    Simpan/replace dataset + pemain. Return dataset_id.
-    """
-    # Dataset
     cols = {c.lower(): c for c in df.columns}
 
-    # --- CEK APAKAH SUDAH ADA DATASET DENGAN LIGA & MUSIM TERSEBUT ---
-    if Dataset.objects.filter(league_name=league_name.strip(), season=season.strip()).exists():
+    # --- CEK APAKAH SUDAH ADA DATASET DENGAN MUSIM TERSEBUT ---
+    if Dataset.objects.filter(season=season.strip()).exists():
         raise ValidationError(f"Data untuk {league_name} musim {season} sudah ada.")
 
     ds, created = Dataset.objects.get_or_create(
@@ -40,7 +36,6 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
     if not created:
         ds.players.all().delete()
 
-    # Player
     bulk = []
     for _, row in df.iterrows():
         player = get_required(row, cols, "player", as_str=True)
@@ -68,7 +63,6 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
         error_pg = get_required(row, cols, "error leading to shot/game")
         totalduel_pg = get_required(row, cols, "total duel won/game")
         aerialduel_pg = get_required(row, cols, "aerial duel won/game")
-
 
         bulk.append(
             Player(
@@ -105,13 +99,13 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
         Player.objects.bulk_create(bulk, batch_size=1000)
     return ds.id
 
-# BACA DATA MUSIM
+# BACA DAFTAR MUSIM
 def get_seasons() -> List[str]:
     return list(
         Dataset.objects.values_list("season", flat=True).distinct().order_by("season")
     )
 
-# BACA DATA PEMAIN
+# BACA DAFTAR PEMAIN
 def get_players_by_season(season: str, position: str) -> List[str]:
     players = list(
         Player.objects.filter(
@@ -156,11 +150,10 @@ def make_template_excel_bytes() -> bytes:
     with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
         template.to_excel(writer, index=False, sheet_name="Template Dataset")
 
-    # Kembalikan byte dari buffer
     buf.seek(0)
     return buf.getvalue()
 
-
+#BACA DATA PEMAIN ACUAN YANG DIPILIHS
 def get_player_detail(season: str, player_name: str) -> dict | None:
     """
     Ambil 1 baris detail pemain untuk musim tertentu. Return dict atau None.
@@ -181,6 +174,7 @@ def get_player_detail(season: str, player_name: str) -> dict | None:
         .first()
     )
 
+#BACA DETAIL MUSIM YANG TERSIMPAN
 def get_list_of_dataset():
     """
     Kembalikan list dict: id, league_name, season, player_count, uploaded_at
@@ -192,6 +186,7 @@ def get_list_of_dataset():
         .order_by('-uploaded_at')
     )
 
+#HAPUS MUSIM
 def delete_dataset(dataset_id: int) -> bool:
     """
     Hapus 1 dataset (cascade akan hapus players-nya).

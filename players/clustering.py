@@ -8,7 +8,7 @@ from sklearn.metrics import silhouette_score, davies_bouldin_score
 from .models import Player
 
 # =============================
-# DEFINISI POSISI & FITUR
+# FITUR YANG TERPAKAI UNTUK CLUSTERING
 # =============================
 POS_GROUPS = {
     "Pemain Penyerang": ["ST", "LW", "RW"],
@@ -34,12 +34,14 @@ FEATURES_BY_POS = {
     ],
 }
 
+# FITUR YANG TIDAK TERPAKAI UNTUK CLUSTERING
 META_COLS = [
     "id", "player", "team", "position", "nationality",
     "age", "appearance", "total_minute",
     "total_goal", "assist", "error"
 ]
 
+# LABEL FITUR UNTUK DITAMPILKAN 
 FEATURE_LABELS = {
     "age": "Age",
     "appearance": "Appearances",
@@ -64,7 +66,7 @@ FEATURE_LABELS = {
 }
 
 # =============================
-# UTILITAS
+# MENGAMBIL DATA FITUR FITUR PEMAIN
 # =============================
 def get_player_features_df(season: str) -> pd.DataFrame:
     all_feats = sorted({f for feats in FEATURES_BY_POS.values() for f in feats})
@@ -76,6 +78,7 @@ def get_player_features_df(season: str) -> pd.DataFrame:
     )
     return pd.DataFrame(list(qs))
 
+# NORMALISASI
 def _prepare_matrix(df: pd.DataFrame, feat_cols):
     X = (
         df[feat_cols]
@@ -91,7 +94,7 @@ def _prepare_matrix(df: pd.DataFrame, feat_cols):
     return Xs, X2
 
 # =============================
-# CLUSTERING
+# MEAN SHIFT CLUSTERING
 # =============================
 def run_meanshift(df: pd.DataFrame, feat_cols):
     """Loop bandwidth 0.5–10 dengan error handling."""
@@ -100,15 +103,14 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
     results = []
 
     for bw in bandwidths:
-        labels, n_clusters, = None, 0
-        for bin_seed in [True]:
-            try:
-                ms = MeanShift(bandwidth=float(bw), bin_seeding=bin_seed, cluster_all=True)
-                labels = ms.fit_predict(Xs)
-                n_clusters = len(np.unique(labels))
-                break
-            except ValueError:
-                raise Exception("Clustering gagal")
+        labels, n_clusters, = None, 0        
+        try:
+            ms = MeanShift(bandwidth=float(bw), bin_seeding=True, cluster_all=True)
+            labels = ms.fit_predict(Xs)
+            n_clusters = len(np.unique(labels))
+            break
+        except ValueError:
+            raise Exception("Clustering gagal")
 
         sil, dbi = None, None
         if labels is not None and n_clusters >= 2:
@@ -144,7 +146,7 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
 
     return {
         "res_table": df_eval,
-        "emb2d": X2,
+        "pca": X2,
         "Xs": Xs,
         "meta": df.reset_index(drop=True),
         "feature_df": df[feat_cols].reset_index(drop=True),
