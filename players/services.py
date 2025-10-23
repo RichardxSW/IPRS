@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 from typing import List
 import pandas as pd
 from django.db import transaction
@@ -24,6 +25,15 @@ def get_required(row, cols, key, as_str=False):
 @transaction.atomic
 def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) -> int:
     cols = {c.lower(): c for c in df.columns}
+
+    # validasi format musim
+    pattern = r"^\d{4}/\d{4}$"
+    if not re.match(pattern, season):
+        raise ValidationError("Format musim tidak valid. Gunakan format seperti 2024/2025.")
+
+    start, end = map(int, season.split("/"))
+    if end - start != 1:
+        raise ValidationError("Tahun akhir harus satu tahun setelah tahun awal, misal 2024/2025.")
 
     # --- CEK APAKAH SUDAH ADA DATASET DENGAN MUSIM TERSEBUT ---
     if Dataset.objects.filter(season=season.strip()).exists():

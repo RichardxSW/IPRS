@@ -67,13 +67,14 @@ if page == "Beranda":
     st.markdown(
         """
         ---
-        ### 🧭 Fitur yang terdapat di website ini
+        ### Fitur yang terdapat di website ini
         1. **Unggah Dataset** → Masukkan data liga dan pemain yang ingin dianalisis.  
         2. **Analisis** → Pilih musim, lakukan clustering, dan temukan pemain rekomendasi.  
         3. **About** → Lihat lebih lanjut tentang website dan pembuat.  
         ---
         """
     )
+    st.write("Sumber data: https://www.sofascore.com/tournament/football/indonesia/liga-1/1015#id:65049")
 
 # UNGGAH DATASET
 elif page == "Unggah Dataset":
@@ -123,7 +124,7 @@ elif page == "Unggah Dataset":
     st.header("Unggah Dataset")
     with st.form("upload_form"):
         league_name = st.text_input("Nama Liga", value="Liga 1 Indonesia")
-        season = st.text_input("Musim", placeholder=f"misal 2024/2025")
+        season = st.text_input("Musim", placeholder=f"misal 2024/2025", value="2024/2025")
         file = st.file_uploader("Unggah file dataset", type="xlsx")
         submitted = st.form_submit_button("Simpan")
 
@@ -550,15 +551,32 @@ elif page == "Analisis":
 elif page == "About":
     st.header("About")
 
-    # st.image("assets/richard.jpg", width=140)  # opsional kalau ada foto profil
+    c1, c2 = st.columns([1,7])
+
+    with c1:
+        st.image("PASFOTO_STUDIO.jpg", width=140)
+
+    with c2:
+        st.markdown("""
+            **Richard Souwiko**  
+        """)
+        st.markdown("""
+            Jurusan Teknik Informatika,
+        """)
+        st.markdown("""
+            Universitas Tarumanagara
+        """)
+
+    c3, c4 = st.columns([1,1])
+
+    with c3:
+        st.markdown("""
+        Website ini dikembangkan sebagai sistem rekomendasi pemain sepak bola berbasis statistik.
+        Tujuannya adalah membantu tim - tim liga Indonesia menemukan pemain lokal yang performanya mirip dengan pemain asing,
+        menggunakan algoritma **Mean Shift** dan **Cosine Similarity**.
+    """)
+
     st.markdown("""
-    **Richard Souwiko**  
-    Mahasiswa Teknik Informatika, Universitas Tarumanagara
-
-    Website ini dikembangkan sebagai sistem rekomendasi pemain sepak bola berbasis statistik.
-    Tujuannya adalah membantu tim sepak bola menemukan pemain lokal yang performanya mirip dengan pemain asing,
-    menggunakan algoritma **Mean Shift** dan **Cosine Similarity**.
-
     Website ini dibangun dengan:
     - **Python** sebagai bahasa pemrograman utama
     - **Streamlit** digunakan untuk membangun UI website

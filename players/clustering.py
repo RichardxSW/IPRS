@@ -104,13 +104,14 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
 
     for bw in bandwidths:
         labels, n_clusters, = None, 0        
-        try:
-            ms = MeanShift(bandwidth=float(bw), bin_seeding=True, cluster_all=True)
-            labels = ms.fit_predict(Xs)
-            n_clusters = len(np.unique(labels))
-            break
-        except ValueError:
-            raise Exception("Clustering gagal")
+        for bin_seed in [True]:
+            try:
+                ms = MeanShift(bandwidth=float(bw), bin_seeding=bin_seed, cluster_all=True)
+                labels = ms.fit_predict(Xs)
+                n_clusters = len(np.unique(labels))
+                break
+            except ValueError:
+                raise Exception("Clustering gagal")
 
         sil, dbi = None, None
         if labels is not None and n_clusters >= 2:
