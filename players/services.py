@@ -199,8 +199,7 @@ def get_list_of_dataset():
 #HAPUS MUSIM
 def delete_dataset(dataset_id: int) -> bool:
     """
-    Hapus 1 dataset (cascade akan hapus players-nya).
-    Return True jika ada yang terhapus.
+    Hapus 1 data liga 
     """
     deleted, _ = Dataset.objects.filter(id=dataset_id).delete()
     return deleted > 0

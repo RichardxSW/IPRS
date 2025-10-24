@@ -586,5 +586,5 @@ elif page == "About":
     """)
 
     st.markdown("---")
-    st.markdown("📧 **Kontak:** richard.s050804@gmail.com | [GitHub](https://github.com/RichardxSW) | [LinkedIn](https://www.linkedin.com/in/richardxsw)")
+    st.markdown("📧 **Kontak:** [richard.s050804@gmail.com](https://mail.google.com/mail/?view=cm&fs=1&to=richard.s050804@gmail.com) | [GitHub](https://github.com/RichardxSW) | [LinkedIn](https://www.linkedin.com/in/richardxsw)")
 
