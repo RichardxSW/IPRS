@@ -65,7 +65,7 @@ def get_recommend_similar_players(
 
     labels = res["best_sil"]["labels"]
     Xs = res["Xs"]
-    meta = res["meta"].copy()  # id, player, team, position, nationality, ...
+    meta = res["meta"].copy()
 
     # cari pemain acuan
     anchor_mask = meta["player"].str.lower() == str(anchor_player).lower()
@@ -80,7 +80,7 @@ def get_recommend_similar_players(
     # ambil hanya pemain dalam cluster yang sama
     same_idx = np.where(labels == anchor_cluster)[0]
     if same_idx.size <= 1:
-        return pd.DataFrame()  # cluster cuma anchor sendiri
+        return pd.DataFrame()
 
     # filter Pemain Indonesia saja
     if "nationality" in meta.columns and only_indonesian:
@@ -102,7 +102,8 @@ def get_recommend_similar_players(
 
     out = meta.iloc[same_idx].copy()
     out["similarity"] = sims
-    # buang pemain acuan
+
+    # MEMBUANG PEMAIN ACUAN
     out = out[out.index != anchor_idx]
     out = out.sort_values("similarity", ascending=False).head(top_n)
 
@@ -110,9 +111,6 @@ def get_recommend_similar_players(
 
 # MEMBACA FITUR UNTUK YANG DIPAKAI UNTUK PEMAIN ACUAN DAN PEMAIN REKOMENDASI
 def get_feature_rows(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> tuple[pd.Series, pd.Series]:
-    """
-    Ambil baris fitur untuk anchor & target. Raise ValueError jika tidak ada.
-    """
     cols = ["player", *features]
     a = feat_df.loc[feat_df["player"] == anchor_player, cols]
     t = feat_df.loc[feat_df["player"] == target_player, cols]
@@ -122,6 +120,8 @@ def get_feature_rows(feat_df: pd.DataFrame, anchor_player: str, target_player: s
         raise ValueError(f"Data fitur '{target_player}' tidak ditemukan.")
     return a.iloc[0], t.iloc[0]
 
+# ==================================================================================================================================
+# UNTUK MEMBUAT CHART PERBANDINGAN
 def build_long_compare_df(anchor_row: pd.Series, target_row: pd.Series, features: list[str]) -> pd.DataFrame:
     """
     Kembalikan long-form dataframe: kolom = Fitur, Pemain, Nilai.
@@ -135,10 +135,11 @@ def build_long_compare_df(anchor_row: pd.Series, target_row: pd.Series, features
     long_df = df.melt(id_vars="Fitur", var_name="Pemain", value_name="Nilai")
     return long_df
 
-# UNTUK MEMBUAT CHART PERBANDINGAN
 def prepare_comparison_long_df(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> pd.DataFrame:
     """
     Satu pintu: ambil baris → bentuk long-form → kembalikan ke UI.
     """
     a_row, t_row = get_feature_rows(feat_df, anchor_player, target_player, features)
     return build_long_compare_df(a_row, t_row, features)
+
+# ==================================================================================================================================

@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import Dict, List, Any
 
-
+# UNTUK VALIDASI JIKA BAR CHART TIDAK BISA DITAMPILKAN
 class BarDataMissing(Exception):
     pass
 

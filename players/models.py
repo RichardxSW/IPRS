@@ -1,16 +1,5 @@
 from django.db import models
 
-# Create your models here.
-class Test(models.Model):
-    tes=models.CharField(max_length=50)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        # unique_together = ('tes')
-        ordering = ['-uploaded_at']
-
-    def __str__(self):
-        return f"{self.tes}"
     
 # MODEL UNTUK DATA MUSIM
 class Dataset(models.Model):

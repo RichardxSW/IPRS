@@ -16,7 +16,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
 import django
 django.setup()
 
-from players.clustering import FEATURE_LABELS, FEATURES_BY_POS, get_player_features_df, run_meanshift, run_meanshift_by_position
+from players.clustering import FEATURE_LABELS, FEATURES_BY_POS, build_cluster_members_df, get_player_features_df, run_meanshift, run_meanshift_by_position
 from players.services import (
     delete_dataset, get_list_of_dataset, get_player_detail, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
 )
@@ -269,6 +269,20 @@ elif page == "Analisis":
                             if best and X2 is not None:
                                 st.write("Nilai Silhouette Terbaik")
                                 plot_clusters(X2, best["labels"], f"{group_name}")
+
+                                # === tabel anggota cluster di bawah scatter plot ===
+                                df_members = build_cluster_members_df(res, best)
+                                if isinstance(df_members, pd.DataFrame) and not df_members.empty:
+                                    st.caption("Daftar pemain per cluster")
+                                    st.data_editor(
+                                        df_members,
+                                        hide_index=True,
+                                        disabled=True,
+                                        height=260,
+                                        use_container_width=True
+                                    )
+                                else:
+                                    st.info("Daftar pemain per cluster tidak ditemukan.")
 
                             # init bar chart tiap fitur
                             try:

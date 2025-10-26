@@ -11,10 +11,9 @@ import io
 
 #VALIDASI DATASET
 def get_required(row, cols, key, as_str=False):
-    """Ambil nilai dari kolom. Raise Exception jika kolom tidak ditemukan."""
     if key not in cols:
         raise KeyError(f"Kolom {key} harus ada di dataset.")
-                    #    f"Kolom yang tersedia: {list(cols.keys())}")
+                    
     val = row[cols[key]]
     if pd.isna(val):
         return None

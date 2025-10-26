@@ -1,4 +1,3 @@
-# players/services.py
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, normalize, RobustScaler
@@ -48,8 +47,8 @@ FEATURE_LABELS = {
     "total_minute": "Total Minutes Played",
     "clearance_per_game": "Clearance/Game",
     "ball_recovered_per_game": "Ball Recovery/Game",    
-    "aerial_duel_per_game": "Aerial Duel/Game",
-    "total_duel_per_game": "Total Duel/Game",
+    "aerial_duel_per_game": "Aerial Duel Won/Game",
+    "total_duel_per_game": "Total Duel Won/Game",
     "successful_pass_per_game": "Successful Pass/Game",
     "long_ball_per_game": "Long Pass/Game",
     "dribbled_past_per_game": "Dribbled Past/Game",    
@@ -78,7 +77,7 @@ def get_player_features_df(season: str) -> pd.DataFrame:
     )
     return pd.DataFrame(list(qs))
 
-# NORMALISASI
+# PREPROCESSING DATA
 def _prepare_matrix(df: pd.DataFrame, feat_cols):
     X = (
         df[feat_cols]
@@ -113,13 +112,16 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
             except ValueError:
                 raise Exception("Clustering gagal")
 
+        # EVALUASI
         sil, dbi = None, None
         if labels is not None and n_clusters >= 2:
             try:
+                # NILAI SILHOUTTE
                 sil = float(silhouette_score(Xs, labels))
             except Exception:
                 pass
             try:
+                # NILAI DBI
                 dbi = float(davies_bouldin_score(Xs, labels))
             except Exception:
                 pass
@@ -150,6 +152,7 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
         "pca": X2,
         "Xs": Xs,
         "meta": df.reset_index(drop=True),
+        "df": df.reset_index(drop=True),
         "feature_df": df[feat_cols].reset_index(drop=True),
         "best_sil": best_sil,
         "best_dbi": best_dbi,
@@ -178,3 +181,49 @@ def run_meanshift_by_position(season: str):
         results[group] = run_meanshift(df_pos, feat_cols)
 
     return results
+
+
+def build_cluster_members_df(res: dict, best: dict):
+    """
+    Bangun DataFrame anggota per cluster (kolom: Cluster 0, Cluster 1, ..., Noise).
+    Tidak memanggil st.* di sini. Return pd.DataFrame atau None.
+    """
+    if not best or "labels" not in best:
+        return None
+
+    labels = np.asarray(best["labels"])
+
+    df_players = res.get("df")
+    if not isinstance(df_players, pd.DataFrame) or "player" not in df_players.columns:
+        return None
+
+    df_players = df_players.reset_index(drop=True)
+    if len(df_players) != len(labels):
+        return None
+
+    # Gabungkan nama pemain dengan label cluster
+    tmp = df_players[["player"]].copy()
+    try:
+        tmp["ClusterId"] = labels.astype(int)
+    except Exception:
+        tmp["ClusterId"] = labels
+
+    # Kumpulkan daftar pemain per cluster
+    grouped = (
+        tmp.groupby("ClusterId")["player"]
+        .apply(list)
+        .to_dict()
+    )
+
+    ordered_ids = sorted(grouped.keys())
+    max_len = max(len(v) for v in grouped.values()) if grouped else 0
+
+    data = {}
+    for cid in ordered_ids:
+        col_name = f"Cluster {cid}"
+        vals = grouped[cid]
+        if len(vals) < max_len:
+            vals = vals + [""] * (max_len - len(vals))
+        data[col_name] = vals
+
+    return pd.DataFrame(data)
