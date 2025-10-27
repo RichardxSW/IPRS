@@ -1,6 +1,7 @@
 from __future__ import annotations
 import re
 from typing import List
+import numpy as np
 import pandas as pd
 from django.db import transaction
 from .models import Dataset, Player
@@ -8,6 +9,21 @@ from django.db.models import Count
 from django.core.exceptions import ValidationError
 import io
 
+# CHOICES BUAT POSISI PEMAIN ACUAN
+POSITION_CHOICES = [
+    "Pilih posisi pemain acuan",
+    "ST",
+    "LW",
+    "RW",
+    "AM",
+    "CM",
+    "LM",
+    "RM",
+    "DM",
+    "CB",
+    "LB",
+    "RB"
+]
 
 #VALIDASI DATASET
 def get_required(row, cols, key, as_str=False):
@@ -128,31 +144,31 @@ def get_players_by_season(season: str, position: str) -> List[str]:
 # DOWNLOAD TEMPLATE DATASET
 def make_template_excel_bytes() -> bytes:
     template = pd.DataFrame({
-        "Player": ["Marc Klok", ""],
-        "Team": ["Persib Bandung", ""],
-        "Nationality": ["Indonesia", ""],
-        "Position": ["DM", ""],
-        "Age": [25, ""],
-        "Appearance": [34, ""],
-        "Total Minute": [3060, ""],
-        "Total Goal": [10, ""],
-        "Goal/game": [1, ""],
-        "Shot/game": [1, ""],
-        "SoT/game": [1, ""],
-        "Assist": [5, ""],
-        "Assist/game": [1, ""],
-        "Success Dribble/game": [8, ""],
-        "Key Pass/game": [5, ""],
-        "Successful Pass/game": [20, ""],
-        "Long Ball/game": [10, ""],
-        "Successful Crossing/game": [10, ""],
-        "Ball Recovered/game": [10, ""],
-        "Dribbled Past/game": [5, ""],
-        "Clearance/game": [5,""],
-        "Error leading to shot": [5, ""],
-        "Error leading to shot/game": [5, ""],
-        "Total duel won/game": [5, ""],
-        "Aerial duel won/game": [5, ""],
+        "Player": ["Marc Klok", np.nan],
+        "Team": ["Persib Bandung", np.nan],
+        "Nationality": ["Indonesia", np.nan],
+        "Position": ["DM", np.nan],
+        "Age": [25, np.nan],
+        "Appearance": [34, np.nan],
+        "Total Minute": [3060, np.nan],
+        "Total Goal": [10, np.nan],
+        "Goal/game": [1, np.nan],
+        "Shot/game": [1, np.nan],
+        "SoT/game": [1, np.nan],
+        "Assist": [5, np.nan],
+        "Assist/game": [1, np.nan],
+        "Success Dribble/game": [8, np.nan],
+        "Key Pass/game": [5, np.nan],
+        "Successful Pass/game": [20, np.nan],
+        "Long Ball/game": [10, np.nan],
+        "Successful Crossing/game": [10, np.nan],
+        "Ball Recovered/game": [10, np.nan],
+        "Dribbled Past/game": [5, np.nan],
+        "Clearance/game": [5,np.nan],
+        "Error leading to shot": [5, np.nan],
+        "Error leading to shot/game": [5, np.nan],
+        "Total duel won/game": [5, np.nan],
+        "Aerial duel won/game": [5, np.nan],
     })
 
     buf = io.BytesIO()

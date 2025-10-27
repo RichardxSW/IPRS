@@ -1,4 +1,3 @@
-# streamlit_app.py
 import os, sys, datetime as dt
 import pandas as pd
 import streamlit as st
@@ -16,9 +15,9 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
 import django
 django.setup()
 
-from players.clustering import FEATURE_LABELS, FEATURES_BY_POS, build_cluster_members_df, get_player_features_df, run_meanshift, run_meanshift_by_position
+from players.clustering import FEATURE_LABELS, FEATURES_BY_POS, build_cluster_members_df, get_player_features_df, run_meanshift_by_position
 from players.services import (
-    delete_dataset, get_list_of_dataset, get_player_detail, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
+    POSITION_CHOICES, delete_dataset, get_list_of_dataset, get_player_detail, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
 )
 from players.recommend import FEATURES_TO_COMPARE, get_recommend_similar_players, prepare_comparison_long_df
 
@@ -60,7 +59,7 @@ for label, target in col_map.items():
 page = st.session_state.page
 
 # =========================
-# BERANDA
+# HALAMAN BERANDA
 # =========================
 if page == "Beranda":
     st.title("Sistem Rekomendasi Pemain Sepak Bola Indonesia")
@@ -76,37 +75,37 @@ if page == "Beranda":
     )
     st.write("Sumber data: https://www.sofascore.com/tournament/football/indonesia/liga-1/1015#id:65049")
 
-# UNGGAH DATASET
+# HALAMAN UNGGAH DATASET
 elif page == "Unggah Dataset":
     st.header("Template Dataset")
 
     # TEMPLATE DATA
     data = {
-        "Player": ["Marc Klok", ""],
-        "Team": ["Persib Bandung", ""],
-        "Nationality": ["Indonesia", ""],
-        "Position": ["DM", ""],
-        "Age": [25, ""],
-        "Appearance": [34, ""],
-        "Total Minute": [3060, ""],
-        "Total Goal": [10, ""],
-        "Goal/game": [1, ""],
-        "Shot/game": [1, ""],
-        "SoT/game": [1, ""],
-        "Assist": [5, ""],
-        "Assist/game": [1, ""],
-        "Success Dribble/game": [8, ""],
-        "Key Pass/game": [5, ""],
-        "Successful Pass/game": [20, ""],
-        "Long Ball/game": [10, ""],
-        "Successful Crossing/game": [10, ""],
-        "Ball Recovered/game": [10, ""],
-        "Dribbled Past/game": [5, ""],
-        "Clearance/game": [5,""],
-        "Error leading to shot": [5, ""],
-        "Error leading to shot/game": [5, ""],
-        "Total duel won/game": [5, ""],
-        "Aerial duel won/game": [5, ""],
+        "Player": ["Marc Klok", np.nan],
+        "Team": ["Persib Bandung", np.nan],
+        "Nationality": ["Indonesia",np.nan],
+        "Position": ["DM", np.nan],
+        "Age": [25, np.nan],
+        "Appearance": [34, np.nan],
+        "Total Minute": [3060, np.nan],
+        "Total Goal": [10, np.nan],
+        "Goal/game": [1,np.nan],
+        "Shot/game": [1, np.nan],
+        "SoT/game": [1, np.nan],
+        "Assist": [5, np.nan],
+        "Assist/game": [1, np.nan],
+        "Success Dribble/game": [8, np.nan],
+        "Key Pass/game": [5, np.nan],
+        "Successful Pass/game": [20, np.nan],
+        "Long Ball/game": [10, np.nan],
+        "Successful Crossing/game": [10, np.nan],
+        "Ball Recovered/game": [10, np.nan],
+        "Dribbled Past/game": [5, np.nan],
+        "Clearance/game": [5,np.nan],
+        "Error leading to shot": [5, np.nan],
+        "Error leading to shot/game": [5, np.nan],
+        "Total duel won/game": [5, np.nan],
+        "Aerial duel won/game": [5, np.nan],
     }
 
 # DOWNLOAD FILE TEMPLATE DATASET
@@ -180,7 +179,7 @@ elif page == "Unggah Dataset":
                 else:
                     st.error("Gagal menghapus data liga.")
 
-# ANALISIS
+# HALAMAN ANALISIS
 elif page == "Analisis":
     st.header("Analisis")
 
@@ -251,7 +250,7 @@ elif page == "Analisis":
                             X2 = res["pca"]
                             best = res["best_sil"]
 
-                            # tabel hasil loop clustering dengan bandwidth
+                            # tabel hasil loop clustering dengan bandwidth dari 0,5 - 5
                             if best:
                                 st.caption(
                                     f"BW={best['bw']:.1f} | Clusters={best['n_clusters']} | "
@@ -270,16 +269,15 @@ elif page == "Analisis":
                                 st.write("Nilai Silhouette Terbaik")
                                 plot_clusters(X2, best["labels"], f"{group_name}")
 
-                                # === tabel anggota cluster di bawah scatter plot ===
+                                # === TABEL DAFTAR PEMAIN TIAP CLUSTER ===
                                 df_members = build_cluster_members_df(res, best)
                                 if isinstance(df_members, pd.DataFrame) and not df_members.empty:
-                                    st.caption("Daftar pemain per cluster")
+                                    # st.write("Daftar Pemain")
                                     st.data_editor(
                                         df_members,
                                         hide_index=True,
                                         disabled=True,
                                         height=260,
-                                        use_container_width=True
                                     )
                                 else:
                                     st.info("Daftar pemain per cluster tidak ditemukan.")
@@ -326,24 +324,9 @@ elif page == "Analisis":
                 if st.button("🔄 Reset Hasil Clustering"):
                     _clear_reco_state()
                     _clear_cluster_state()
-                    st.rerun()
-    
-            position_choices = [
-                "Pilih posisi pemain acuan",
-                "ST",
-                "LW",
-                "RW",
-                "AM",
-                "CM",
-                "LM",
-                "RM",
-                "DM",
-                "CB",
-                "LB",
-                "RB"
-            ]
+                    st.rerun()            
 
-            selected_position = st.selectbox("Pilih Posisi Pemain Acuan", position_choices, index=0)
+            selected_position = st.selectbox("Pilih Posisi Pemain Acuan", POSITION_CHOICES, index=0)
 
             if selected_position != "Pilih posisi pemain acuan":
                 players = get_players_by_season(selected_season, selected_position) if selected_season and selected_position else []
@@ -399,7 +382,6 @@ elif page == "Analisis":
 
             if detail:
                 st.subheader("Tentang Pemain")
-                # st.write(f"**Musim**: {selected_season}")
                 st.write(f"Pemain: **{selected_player}**")
                 col1, col2 = st.columns(2)
 
@@ -561,7 +543,7 @@ elif page == "Analisis":
                                             with c:
                                                 st.altair_chart(chart)
 
-# ABOUT
+# HALAMAN ABOUT
 elif page == "About":
     st.header("About")
 

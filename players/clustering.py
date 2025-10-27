@@ -1,3 +1,4 @@
+import warnings
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import StandardScaler, normalize, RobustScaler
@@ -106,7 +107,9 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
         for bin_seed in [True]:
             try:
                 ms = MeanShift(bandwidth=float(bw), bin_seeding=bin_seed, cluster_all=True)
-                labels = ms.fit_predict(Xs)
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    labels = ms.fit_predict(Xs)
                 n_clusters = len(np.unique(labels))
                 break
             except ValueError:
