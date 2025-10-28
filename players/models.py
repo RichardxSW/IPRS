@@ -2,7 +2,7 @@ from django.db import models
 
     
 # MODEL UNTUK DATA MUSIM
-class Dataset(models.Model):
+class Season(models.Model):
     league_name=models.CharField(max_length=50)
     season=models.CharField(max_length=50)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -16,7 +16,7 @@ class Dataset(models.Model):
     
 # MODEL UNTUK DATA PEMAIN
 class Player(models.Model):
-    dataset=models.ForeignKey(Dataset, on_delete=models.CASCADE, related_name='players')
+    season=models.ForeignKey(Season, on_delete=models.CASCADE, related_name='players')
     player=models.CharField(max_length=100)
     team=models.CharField(max_length=50, blank=True, null=True)
     nationality=models.CharField(max_length=50, blank=True, null=True)

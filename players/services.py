@@ -4,7 +4,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from django.db import transaction
-from .models import Dataset, Player
+from .models import Player, Season
 from django.db.models import Count
 from django.core.exceptions import ValidationError
 import io
@@ -51,10 +51,10 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
         raise ValidationError("Tahun akhir harus satu tahun setelah tahun awal, misal 2024/2025.")
 
     # --- CEK APAKAH SUDAH ADA DATASET DENGAN MUSIM TERSEBUT ---
-    if Dataset.objects.filter(season=season.strip()).exists():
+    if Season.objects.filter(season=season.strip()).exists():
         raise ValidationError(f"Data untuk {league_name} musim {season} sudah ada.")
 
-    ds, created = Dataset.objects.get_or_create(
+    ds, created = Season.objects.get_or_create(
         league_name=league_name.strip(),
         season=season.strip()
     )
@@ -127,14 +127,14 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
 # BACA DAFTAR MUSIM
 def get_seasons() -> List[str]:
     return list(
-        Dataset.objects.values_list("season", flat=True).distinct().order_by("season")
+        Season.objects.values_list("season", flat=True).distinct().order_by("season")
     )
 
 # BACA DAFTAR PEMAIN
 def get_players_by_season(season: str, position: str) -> List[str]:
     players = list(
         Player.objects.filter(
-            dataset__season=season, 
+            season__season=season, 
             position__icontains=position,
         ).order_by("player").values_list("player", flat=True)
     )
@@ -194,7 +194,7 @@ def get_player_detail(season: str, player_name: str) -> dict | None:
     ]
     return (
         Player.objects
-        .filter(dataset__season=season, player=player_name)
+        .filter(season__season=season, player=player_name)
         .values(*fields)
         .first()
     )
@@ -205,7 +205,7 @@ def get_list_of_dataset():
     Kembalikan list dict: id, league_name, season, player_count, uploaded_at
     """
     return list(
-        Dataset.objects
+        Season.objects
         .annotate(player_count=Count('players'))
         .values('id', 'league_name', 'season', 'player_count', 'uploaded_at')
         .order_by('-uploaded_at')
@@ -216,7 +216,7 @@ def delete_dataset(dataset_id: int) -> bool:
     """
     Hapus 1 data liga 
     """
-    deleted, _ = Dataset.objects.filter(id=dataset_id).delete()
+    deleted, _ = Season.objects.filter(id=dataset_id).delete()
     return deleted > 0
 
 

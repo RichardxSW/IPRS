@@ -72,7 +72,7 @@ def get_player_features_df(season: str) -> pd.DataFrame:
     all_feats = sorted({f for feats in FEATURES_BY_POS.values() for f in feats})
     qs = (
         Player.objects
-        .filter(dataset__season=season)
+        .filter(season__season=season)
         .values(*META_COLS, *all_feats)
         .order_by("player")
     )
