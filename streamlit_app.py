@@ -272,7 +272,7 @@ elif page == "Analisis":
                                 # === TABEL DAFTAR PEMAIN TIAP CLUSTER ===
                                 df_members = build_cluster_members_df(res, best)
                                 if isinstance(df_members, pd.DataFrame) and not df_members.empty:
-                                    # st.write("Daftar Pemain")
+                                    st.write("Daftar Pemain")
                                     st.data_editor(
                                         df_members,
                                         hide_index=True,

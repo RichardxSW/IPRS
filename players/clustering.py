@@ -162,6 +162,7 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
         "same_bw": same_bw,
     }
 
+# MENJALANKAN MEAN SHIFT PER KATEGORI POSISI PEMAIN
 def run_meanshift_by_position(season: str):
     """
     Jalankan clustering per kategori posisi
@@ -185,12 +186,8 @@ def run_meanshift_by_position(season: str):
 
     return results
 
-
+# UNTUK MEMBUAT DAFTAR PEMAIN PER CLUSTER
 def build_cluster_members_df(res: dict, best: dict):
-    """
-    Bangun DataFrame anggota per cluster (kolom: Cluster 0, Cluster 1, ..., Noise).
-    Tidak memanggil st.* di sini. Return pd.DataFrame atau None.
-    """
     if not best or "labels" not in best:
         return None
 
@@ -204,14 +201,12 @@ def build_cluster_members_df(res: dict, best: dict):
     if len(df_players) != len(labels):
         return None
 
-    # Gabungkan nama pemain dengan label cluster
     tmp = df_players[["player"]].copy()
     try:
         tmp["ClusterId"] = labels.astype(int)
     except Exception:
         tmp["ClusterId"] = labels
 
-    # Kumpulkan daftar pemain per cluster
     grouped = (
         tmp.groupby("ClusterId")["player"]
         .apply(list)
