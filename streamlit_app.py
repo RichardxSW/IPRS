@@ -46,10 +46,10 @@ if "page" not in st.session_state:
     st.session_state.page = "Beranda"
 
 col_map = {
-    "🏠 Beranda": "Beranda",
-    "📤 Unggah Dataset": "Unggah Dataset",
-    "📊 Analisis": "Analisis",
-    "ℹ️ About": "About",
+    "Beranda": "Beranda",
+    "Unggah Dataset": "Unggah Dataset",
+    "Analisis": "Analisis",
+    "About": "About",
 }
 
 for label, target in col_map.items():
@@ -67,13 +67,12 @@ if page == "Beranda":
         """
         ---
         ### Fitur yang terdapat di website ini
-        1. **Unggah Dataset** → Masukkan data liga dan pemain yang ingin dianalisis.  
-        2. **Analisis** → Pilih musim, lakukan clustering, dan temukan pemain rekomendasi.  
-        3. **About** → Lihat lebih lanjut tentang website dan pembuat.  
-        ---
         """
     )
-    st.write("Sumber data: https://www.sofascore.com/tournament/football/indonesia/liga-1/1015#id:65049")
+    st.write("- **Unggah Dataset** → Download template dataset dan menyimpan data liga dan pemain.")
+    st.write("- **Analisis** → Pilih musim, lakukan clustering, mencari pemain rekomendasi, dan membandingkan pemain acuan dan pemain rekmendasi.")
+    st.write("- **About** → Lihat lebih lanjut tentang pembuat dan website.")
+    st.markdown("---")
 
 # HALAMAN UNGGAH DATASET
 elif page == "Unggah Dataset":
@@ -475,7 +474,6 @@ elif page == "Analisis":
                     col_head3.write("**Posisi**")
                     col_head4.write("**Nationality**")
                     col_head5.write("**Kemiripan**")
-                    # col_head6.write("**Aksi**")
 
                     cols_show = ["player", "team", "position", "nationality", "similarity"]
                     cols_show = [c for c in cols_show if c in recs_df.columns]
@@ -545,12 +543,12 @@ elif page == "Analisis":
 
 # HALAMAN ABOUT
 elif page == "About":
-    st.header("About")
+    st.header("Tentang Saya")
 
     c1, c2 = st.columns([1,7])
 
     with c1:
-        st.image("PASFOTO_STUDIO.jpg", width=140)
+        st.image("PASFOTO_STUDIO.jpg", width=100)
 
     with c2:
         st.markdown("""
@@ -563,7 +561,9 @@ elif page == "About":
             Universitas Tarumanagara
         """)
 
-    c3, c4 = st.columns([1,1])
+    st.header("Tentang Website")
+
+    c3, c4 = st.columns([2,1])
 
     with c3:
         st.markdown("""
@@ -581,6 +581,11 @@ elif page == "About":
 
     """)
 
+    st.header("Sumber Data")
+    st.write("Data diambil dari : [Sumber data](https://www.sofascore.com/tournament/football/indonesia/liga-1/1015#id:65049)")
+
     st.markdown("---")
-    st.markdown("📧 **Kontak:** [richard.s050804@gmail.com](https://mail.google.com/mail/?view=cm&fs=1&to=richard.s050804@gmail.com) | [GitHub](https://github.com/RichardxSW) | [LinkedIn](https://www.linkedin.com/in/richardxsw)")
+
+    st.header("Kontak")
+    st.markdown("[richard.s050804@gmail.com](https://mail.google.com/mail/?view=cm&fs=1&to=richard.s050804@gmail.com) | [GitHub](https://github.com/RichardxSW)")
 
