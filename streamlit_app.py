@@ -17,7 +17,7 @@ django.setup()
 
 from players.clustering import FEATURE_LABELS, FEATURES_BY_POS, build_cluster_members_df, get_player_features_df, run_meanshift_by_position
 from players.services import (
-    POSITION_CHOICES, delete_dataset, get_list_of_dataset, get_player_detail, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
+    POSITION_CHOICES, delete_dataset, get_clubs_by_season, get_list_of_season, get_player_detail, get_players_by_season_and_club, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
 )
 from players.recommend import FEATURES_TO_COMPARE, get_recommend_similar_players, prepare_comparison_long_df
 
@@ -151,9 +151,9 @@ elif page == "Unggah Dataset":
 
     st.markdown("---")
 
-    datasets = get_list_of_dataset()
+    seasons = get_list_of_season()
 
-    if not datasets:
+    if not seasons:
         st.info("Belum ada data yang tersimpan")
     else:
         # DATA MUSIM YANG SUDAH DIUNGGAH
@@ -163,7 +163,7 @@ elif page == "Unggah Dataset":
         col_head3.write("**Jumlah Pemain**")
         col_head4.write("**Diunggah**")
 
-        for ds in datasets:
+        for ds in seasons:
             col1, col2, col3, col4, col5 = st.columns([3, 2, 2, 2, 2])
             col1.write(ds["league_name"])
             col2.write(ds["season"])
@@ -328,8 +328,22 @@ elif page == "Analisis":
             selected_position = st.selectbox("Pilih Posisi Pemain Acuan", POSITION_CHOICES, index=0)
 
             if selected_position != "Pilih posisi pemain acuan":
-                players = get_players_by_season(selected_season, selected_position) if selected_season and selected_position else []
-                player_option = ["Pilih Pemain Acuan"] + players
+                st.session_state.setdefault("club_filter", "Semua")
+
+                club_options = ["Semua"] + get_clubs_by_season(season=selected_season)                    
+                
+                selected_club = st.selectbox("Pilih Klub (opsional)", options=club_options, index=0)
+                st.session_state["club_filter"] = selected_club
+
+                if selected_season and selected_position:
+                    if selected_club and selected_club != "Semua":
+                        players = get_players_by_season_and_club(selected_season, selected_position, selected_club)
+                    else:                        
+                        players = get_players_by_season(selected_season, selected_position)
+                else:
+                    players = []
+
+                player_option = ["Pilih Pemain Acuan"] + (players if players else [])
                 selected_player = st.selectbox("Pilih Pemain Acuan", player_option, index=0)
             else:
                 selected_player = None
@@ -339,6 +353,7 @@ elif page == "Analisis":
         st.session_state.setdefault("prev_season", None)
         st.session_state.setdefault("prev_position", None)
         st.session_state.setdefault("prev_anchor", None)
+        st.session_state.setdefault("prev_club_filter", None)
 
         def _clear_reco_state():
             st.session_state["recs_df"] = None
@@ -352,6 +367,7 @@ elif page == "Analisis":
         season_changed   = (st.session_state["prev_season"]   != selected_season)
         position_changed = (st.session_state["prev_position"] != selected_position)
         anchor_changed   = (st.session_state["prev_anchor"]   != selected_player)
+        club_changed     = (st.session_state["prev_club_filter"] != st.session_state.get("club_filter"))
 
         if season_changed:
             _clear_reco_state()
@@ -367,16 +383,21 @@ elif page == "Analisis":
                 st.session_state["prev_position"] = selected_position
                 st.session_state["prev_anchor"] = None
 
+        if club_changed:
+            _clear_reco_state()
+            st.session_state["prev_anchor"] = None
+
         if anchor_changed:
             _clear_reco_state()
 
         st.session_state["prev_season"]   = selected_season
         st.session_state["prev_position"] = selected_position
         st.session_state["prev_anchor"]   = selected_player
+        st.session_state["prev_club_filter"] = st.session_state.get("club_filter")
         # -------------------------------------------------------------------------
         
         # DETAIL PEMAIN ACUAN
-        if selected_season and selected_position and selected_player:
+        if selected_season and selected_position and selected_player and selected_player != "Pilih Pemain Acuan":
             detail = get_player_detail(selected_season, selected_player)
 
             if detail:
@@ -431,7 +452,8 @@ elif page == "Analisis":
                     "Jumlah pemain rekomendasi",
                     min_value=1,
                     max_value=10,
-                    step=1
+                    step=1,
+                    value=10
                 )
 
                 col7, col8, col9, col10 = st.columns(4)
@@ -441,6 +463,9 @@ elif page == "Analisis":
 
                 with col8:
                     filter_position = st.checkbox("Posisi yang sama saja", value=False)
+
+                with col9:
+                    diff_club = st.checkbox("Klub yang berbeda saja", value=False)
                 
                 if recommend_count and st.button("Cari pemain rekomendasi"):
                     recs = get_recommend_similar_players(
@@ -449,7 +474,8 @@ elif page == "Analisis":
                         anchor_player=selected_player,
                         top_n=recommend_count,
                         only_indonesian=only_indo,
-                        filter_position=filter_position
+                        filter_position=filter_position,
+                        diff_club=diff_club
                     )
 
                     if recs.empty:

@@ -7,10 +7,10 @@ class BarDataMissing(Exception):
 
 #MEMBACA FITUR PER POSISI YANG AKAN DIPAKAI
 def get_features_for_group(group_name: str, features_by_pos: Dict[str, List[str]]) -> List[str]:
-    feats = features_by_pos.get(group_name, [])
-    if not feats:
+    features = features_by_pos.get(group_name, [])
+    if not features:
         raise BarDataMissing(f"Tidak ada fitur untuk posisi '{group_name}'.")
-    return feats
+    return features
 
 # BAR CHART UNTUK HASIL CLUSTERING
 def build_cluster_feature_bar_df(res: Dict[str, Any], feature_cols: List[str]) -> pd.DataFrame:

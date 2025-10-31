@@ -23,7 +23,8 @@ FEATURES_BY_POS = {
         "key_pass_per_game", "total_duel_per_game", "aerial_duel_per_game"
     ],
     "Pemain Gelandang": [
-        "goal_per_game", "shot_per_game", "sot_per_game", "assist_per_game", "key_pass_per_game", "successful_pass_per_game",
+        "goal_per_game", "shot_per_game", "sot_per_game", 
+        "assist_per_game", "key_pass_per_game", "successful_pass_per_game",
         "long_ball_per_game", "successful_dribble_per_game", "aerial_duel_per_game", "successful_crossing_per_game",
         "ball_recovered_per_game", "total_duel_per_game", "dribbled_past_per_game", "clearance_per_game"
     ],
@@ -69,11 +70,11 @@ FEATURE_LABELS = {
 # MENGAMBIL DATA FITUR FITUR PEMAIN
 # =============================
 def get_player_features_df(season: str) -> pd.DataFrame:
-    all_feats = sorted({f for feats in FEATURES_BY_POS.values() for f in feats})
+    all_feature = sorted({f for feats in FEATURES_BY_POS.values() for f in feats})
     qs = (
         Player.objects
         .filter(season__season=season)
-        .values(*META_COLS, *all_feats)
+        .values(*META_COLS, *all_feature)
         .order_by("player")
     )
     return pd.DataFrame(list(qs))
@@ -87,21 +88,24 @@ def _prepare_matrix(df: pd.DataFrame, feat_cols):
         .fillna(0.0)
         .values
     )
-    scaler = StandardScaler()
-    Xs = scaler.fit_transform(X)
-    pca = PCA(n_components=2)
-    X2 = pca.fit_transform(Xs)
-    return Xs, X2
+
+    X_scaled = StandardScaler().fit_transform(X)    
+    X_pca = PCA(n_components=2).fit_transform(X_scaled)
+    return X_pca, X_scaled
 
 # =============================
 # MEAN SHIFT CLUSTERING
 # =============================
 def run_meanshift(df: pd.DataFrame, feat_cols):
-    """Loop bandwidth 0.5–10 dengan error handling."""
-    Xs, X2 = _prepare_matrix(df, feat_cols)
+    #PREPROSES
+    X_scaled, X_pca = _prepare_matrix(df, feat_cols)
+
+    # BANDWIDTH
     bandwidths = np.arange(0.5, 5.5, 0.5)
+
     results = []
 
+    #LOOP MEANSHIFT 
     for bw in bandwidths:
         labels, n_clusters, = None, 0        
         for bin_seed in [True]:
@@ -109,7 +113,8 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
                 ms = MeanShift(bandwidth=float(bw), bin_seeding=bin_seed, cluster_all=True)
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", UserWarning)
-                    labels = ms.fit_predict(Xs)
+                    labels = ms.fit_predict(X_scaled)
+                # JUMLAH CLUSTER
                 n_clusters = len(np.unique(labels))
                 break
             except ValueError:
@@ -120,12 +125,12 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
         if labels is not None and n_clusters >= 2:
             try:
                 # NILAI SILHOUTTE
-                sil = float(silhouette_score(Xs, labels))
+                sil = float(silhouette_score(X_pca, labels))
             except Exception:
                 pass
             try:
                 # NILAI DBI
-                dbi = float(davies_bouldin_score(Xs, labels))
+                dbi = float(davies_bouldin_score(X_scaled, labels))
             except Exception:
                 pass
 
@@ -152,8 +157,8 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
 
     return {
         "res_table": df_eval,
-        "pca": X2,
-        "Xs": Xs,
+        "pca": X_pca,
+        "Xs": X_scaled,
         "meta": df.reset_index(drop=True),
         "df": df.reset_index(drop=True),
         "feature_df": df[feat_cols].reset_index(drop=True),
@@ -174,15 +179,15 @@ def run_meanshift_by_position(season: str):
 
     results = {}
     for group, positions in POS_GROUPS.items():
-        df_pos = df_all[df_all["position"].apply(
+        df_by_position = df_all[df_all["position"].apply(
             lambda p: any(pos in str(p).upper().replace(" ", "").split(",") or
                           pos in str(p).upper().replace(" ", "") for pos in positions)
         )]
-        feat_cols = FEATURES_BY_POS[group]
-        if len(df_pos) < 3:
+        feat_columns = FEATURES_BY_POS[group]
+        if len(df_by_position) < 3:
             results[group] = None
             continue
-        results[group] = run_meanshift(df_pos, feat_cols)
+        results[group] = run_meanshift(df_by_position, feat_columns)
 
     return results
 

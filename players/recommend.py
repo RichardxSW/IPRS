@@ -46,7 +46,8 @@ def get_recommend_similar_players(
     anchor_player: str,
     top_n: int = 5,
     only_indonesian: bool = False,
-    filter_position: bool = False
+    filter_position: bool = False,
+    diff_club: bool = False
 ):
     """
     Rekomendasi berbasis cosine:
@@ -87,13 +88,11 @@ def get_recommend_similar_players(
         same_idx = [i for i in same_idx if str(meta.loc[i, "nationality"]).strip().lower() == "indonesia"]
         if len(same_idx) <= 1:
             return pd.DataFrame()
-        
-    # if "position" in meta.columns and filter_position:
-    #     same_idx = [j for j in same_idx if str(meta.loc[j, "position"]).strip() == position_code]
 
     # FILTER POSISI YANG SAMA DENGAN PEMAIN ACUAN
     if "position" in meta.columns and filter_position:
         same_idx = [j for j in same_idx if _matches_position(meta.loc[j, "position"], anchor_tokens)]
+
 
     # hitung cosine similarity antara pemain acuan dan pemain dalam cluster yg sama
     anchor_vec = Xs[anchor_idx:anchor_idx+1]
@@ -105,6 +104,12 @@ def get_recommend_similar_players(
 
     # MEMBUANG PEMAIN ACUAN
     out = out[out.index != anchor_idx]
+
+    # FILTER KLUB
+    if diff_club and "team" in meta.columns:
+        anchor_team = str(meta.loc[anchor_idx, "team"]).strip().lower()
+        out = out[out["team"].str.strip().str.lower() != anchor_team]
+        
     out = out.sort_values("similarity", ascending=False).head(top_n)
 
     return out.reset_index(drop=True)

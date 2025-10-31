@@ -91,7 +91,7 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
 
         bulk.append(
             Player(
-                dataset=ds,
+                season=ds,
                 player=player,
                 team=team, 
                 nationality=nat, 
@@ -130,7 +130,20 @@ def get_seasons() -> List[str]:
         Season.objects.values_list("season", flat=True).distinct().order_by("season")
     )
 
-# BACA DAFTAR PEMAIN
+# AMBIL DATA KLUB
+def get_clubs_by_season(season: str) -> List[str]:
+    club = list(
+        Player.objects.filter(
+            season__season=season
+        )
+        .order_by("team")
+        .values_list("team", flat=True)
+        .distinct()
+    )
+    print(len(club))
+    return club
+
+# AMBIL DATA PEMAIN
 def get_players_by_season(season: str, position: str) -> List[str]:
     players = list(
         Player.objects.filter(
@@ -138,6 +151,19 @@ def get_players_by_season(season: str, position: str) -> List[str]:
             position__icontains=position,
         ).order_by("player").values_list("player", flat=True)
     )
+    print(len(players))
+    return players
+
+# AMBIL DATA PEMAIN DENGAN FILTER KLUB
+def get_players_by_season_and_club(season: str, position: str, club: str) -> List[str]:    
+    qs = Player.objects.filter(
+        season__season=season,
+        position__icontains=position,
+    )
+    if club and club.lower() != "semua klub":
+        qs = qs.filter(team__iexact=club)
+
+    players = list(qs.order_by("player").values_list("player", flat=True))
     print(len(players))
     return players
 
@@ -178,7 +204,7 @@ def make_template_excel_bytes() -> bytes:
     buf.seek(0)
     return buf.getvalue()
 
-#BACA DATA PEMAIN ACUAN YANG DIPILIHS
+#BACA DATA PEMAIN ACUAN 
 def get_player_detail(season: str, player_name: str) -> dict | None:
     """
     Ambil 1 baris detail pemain untuk musim tertentu. Return dict atau None.
@@ -200,7 +226,7 @@ def get_player_detail(season: str, player_name: str) -> dict | None:
     )
 
 #BACA DETAIL MUSIM YANG TERSIMPAN
-def get_list_of_dataset():
+def get_list_of_season():
     """
     Kembalikan list dict: id, league_name, season, player_count, uploaded_at
     """
