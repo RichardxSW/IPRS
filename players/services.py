@@ -25,21 +25,23 @@ POSITION_CHOICES = [
     "RB"
 ]
 
-#VALIDASI DATASET
-def get_required(row, cols, key, as_str=False):
-    if key not in cols:
+#VALIDASI FITUR PADA DATASET
+def get_required(row, columns, key, string=False):
+    if key not in columns:
         raise KeyError(f"Kolom {key} harus ada di dataset.")
                     
-    val = row[cols[key]]
+    val = row[columns[key]]
+
     if pd.isna(val):
         return None
-    return str(val).strip() if as_str else val
+    
+    return str(val).strip() if string else val
 
 
 # POST DATASET KE DATABASE
 @transaction.atomic
 def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) -> int:
-    cols = {c.lower(): c for c in df.columns}
+    column = {c.lower(): c for c in df.columns}
 
     # validasi format musim
     pattern = r"^\d{4}/\d{4}$"
@@ -63,31 +65,31 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
 
     bulk = []
     for _, row in df.iterrows():
-        player = get_required(row, cols, "player", as_str=True)
-        team = get_required(row, cols, "team", as_str=True)
-        nat = get_required(row, cols, "nationality", as_str=True)
-        pos  = get_required(row, cols, "position", as_str=True)
-        age  = get_required(row, cols, "age")
-        app  = get_required(row, cols, "appearance")
-        total_minute  = get_required(row, cols, "total minute")
-        total_goal  = get_required(row, cols, "total goal")
-        goal_pg = get_required(row, cols, "goal/game")
-        shot_pg = get_required(row, cols, "shot/game")
-        sot_pg = get_required(row, cols, "sot/game")
-        assist = get_required(row, cols, "assist")
-        assist_pg = get_required(row, cols, "assist/game")
-        dribble_pg = get_required(row, cols, "successful dribble/game")
-        keypass_pg = get_required(row, cols, "key pass/game")
-        pass_pg = get_required(row, cols, "successful pass/game")
-        longball_pg = get_required(row, cols, "long ball/game")
-        crossing_pg = get_required(row, cols, "successful crossing/game")
-        ballrecovered_pg = get_required(row, cols, "ball recovered/game")
-        dribbledpast_pg = get_required(row, cols, "dribbled past/game")
-        clearance_pg = get_required(row, cols, "clearance/game")
-        error = get_required(row, cols, "error leading to shot")
-        error_pg = get_required(row, cols, "error leading to shot/game")
-        totalduel_pg = get_required(row, cols, "total duel won/game")
-        aerialduel_pg = get_required(row, cols, "aerial duel won/game")
+        player = get_required(row, column, "player", string=True)
+        team = get_required(row, column, "team", string=True)
+        nat = get_required(row, column, "nationality", string=True)
+        pos  = get_required(row, column, "position", string=True)
+        age  = get_required(row, column, "age")
+        app  = get_required(row, column, "appearance")
+        total_minute  = get_required(row, column, "total minute")
+        total_goal  = get_required(row, column, "total goal")
+        goal_pg = get_required(row, column, "goal/game")
+        shot_pg = get_required(row, column, "shot/game")
+        sot_pg = get_required(row, column, "sot/game")
+        assist = get_required(row, column, "assist")
+        assist_pg = get_required(row, column, "assist/game")
+        dribble_pg = get_required(row, column, "successful dribble/game")
+        keypass_pg = get_required(row, column, "key pass/game")
+        pass_pg = get_required(row, column, "successful pass/game")
+        longball_pg = get_required(row, column, "long ball/game")
+        crossing_pg = get_required(row, column, "successful crossing/game")
+        ballrecovered_pg = get_required(row, column, "ball recovered/game")
+        dribbledpast_pg = get_required(row, column, "dribbled past/game")
+        clearance_pg = get_required(row, column, "clearance/game")
+        error = get_required(row, column, "error leading to shot")
+        error_pg = get_required(row, column, "error leading to shot/game")
+        totalduel_pg = get_required(row, column, "total duel won/game")
+        aerialduel_pg = get_required(row, column, "aerial duel won/game")
 
         bulk.append(
             Player(
@@ -122,6 +124,7 @@ def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) 
 
     if bulk:
         Player.objects.bulk_create(bulk, batch_size=1000)
+
     return ds.id
 
 # BACA DAFTAR MUSIM
@@ -206,17 +209,14 @@ def make_template_excel_bytes() -> bytes:
 
 #BACA DATA PEMAIN ACUAN 
 def get_player_detail(season: str, player_name: str) -> dict | None:
-    """
-    Ambil 1 baris detail pemain untuk musim tertentu. Return dict atau None.
-    """
     fields = [
-        "player","team","nationality","position","age",
-        "appearance","total_minute","total_goal","assist",
-        "goal_per_game","shot_per_game","sot_per_game",
-        "assist_per_game","successful_dribble_per_game","key_pass_per_game",
-        "successful_pass_per_game","long_ball_per_game","successful_crossing_per_game",
-        "ball_recovered_per_game","dribbled_past_per_game","clearance_per_game",
-        "error","error_per_game","total_duel_per_game","aerial_duel_per_game",
+        "player", "team", "nationality", "position", "age",
+        "appearance", "total_minute", "total_goal","assist",
+        "goal_per_game", "shot_per_game", "sot_per_game",
+        "assist_per_game", "successful_dribble_per_game", "key_pass_per_game",
+        "successful_pass_per_game", "long_ball_per_game", "successful_crossing_per_game",
+        "ball_recovered_per_game", "dribbled_past_per_game", "clearance_per_game",
+        "error", "error_per_game", "total_duel_per_game", "aerial_duel_per_game",
     ]
     return (
         Player.objects
@@ -227,9 +227,6 @@ def get_player_detail(season: str, player_name: str) -> dict | None:
 
 #BACA DETAIL MUSIM YANG TERSIMPAN
 def get_list_of_season():
-    """
-    Kembalikan list dict: id, league_name, season, player_count, uploaded_at
-    """
     return list(
         Season.objects
         .annotate(player_count=Count('players'))
@@ -239,9 +236,6 @@ def get_list_of_season():
 
 #HAPUS MUSIM
 def delete_dataset(dataset_id: int) -> bool:
-    """
-    Hapus 1 data liga 
-    """
     deleted, _ = Season.objects.filter(id=dataset_id).delete()
     return deleted > 0
 

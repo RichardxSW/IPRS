@@ -15,11 +15,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
 import django
 django.setup()
 
-from players.clustering import FEATURE_LABELS, FEATURES_BY_POS, build_cluster_members_df, get_player_features_df, run_meanshift_by_position
+from players.clustering import FEATURE_LABELS, FEATURES_BY_POSITION, build_cluster_members_df, get_player_features_df, run_meanshift_by_position
 from players.services import (
     POSITION_CHOICES, delete_dataset, get_clubs_by_season, get_list_of_season, get_player_detail, get_players_by_season_and_club, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
 )
-from players.recommend import FEATURES_TO_COMPARE, get_recommend_similar_players, prepare_comparison_long_df
+from players.recommend import FEATURES_TO_COMPARE, get_recommend_similar_players, prepare_comparison_chart_data
 
 st.set_page_config(page_title="IPRS", layout="wide")
 
@@ -45,14 +45,14 @@ st.sidebar.title("IPRS")
 if "page" not in st.session_state:
     st.session_state.page = "Beranda"
 
-col_map = {
+sidebar_map = {
     "Beranda": "Beranda",
     "Unggah Dataset": "Unggah Dataset",
     "Analisis": "Analisis",
     "About": "About",
 }
 
-for label, target in col_map.items():
+for label, target in sidebar_map.items():
     if st.sidebar.button(label):
         st.session_state.page = target
 
@@ -183,16 +183,16 @@ elif page == "Analisis":
     st.header("Analisis")
 
     # ==== HELPER UNTUK RESET STATE ====
-    st.session_state.setdefault("recs_df", None)
-    st.session_state.setdefault("feat_df", None)
-    st.session_state.setdefault("cmp_target", None)
+    st.session_state.setdefault("recommend_state", None)
+    st.session_state.setdefault("features", None)
+    st.session_state.setdefault("compare_recommend", None)
     st.session_state.setdefault("cluster_result", None)
     st.session_state.setdefault("selected_season", None)
 
     def _clear_reco_state():
-        st.session_state["recs_df"] = None
-        st.session_state["feat_df"] = None
-        st.session_state["cmp_target"] = None
+        st.session_state["recommend_state"] = None
+        st.session_state["features"] = None
+        st.session_state["compare_recommend"] = None
 
     def _clear_cluster_state():
         st.session_state["cluster_result"] = None
@@ -225,9 +225,9 @@ elif page == "Analisis":
                 group_items = list(results.items())
                 N_COLS = 3
 
-                def plot_clusters(x2, labels, title):
+                def plot_clusters(X_pca, labels, title):
                     fig, ax = plt.subplots(figsize=(4,3))
-                    sc = ax.scatter(x2[:, 0], x2[:, 1], c=labels, s=28, alpha=0.9)
+                    sc = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=labels, s=28, alpha=0.9)
                     ax.set_xlabel("PCA 1"); ax.set_ylabel("PCA 2")
                     ax.set_title(title)
                     uniq, counts = np.unique(labels, return_counts=True)
@@ -237,23 +237,23 @@ elif page == "Analisis":
 
                 # tampilkan per posisi
                 for start in range(0, len(group_items), N_COLS):
-                    cols = st.columns(N_COLS)
-                    for c, (group_name, res) in zip(cols, group_items[start:start+N_COLS]):
+                    columns = st.columns(N_COLS)
+                    for c, (group_name, results) in zip(columns, group_items[start:start+N_COLS]):
                         with c:
                             st.markdown(f"### {group_name}")
-                            if not res:
+                            if not results:
                                 st.warning(f"Tidak cukup data untuk posisi {group_name.lower()}.")
                                 continue
 
-                            df_eval = res["res_table"]
-                            X2 = res["pca"]
-                            best = res["best_sil"]
+                            df_eval = results["cluster_result"]
+                            X_pca = results["X_pca"]
+                            best = results["best_silhouette"]
 
                             # tabel hasil loop clustering dengan bandwidth dari 0,5 - 5
                             if best:
                                 st.caption(
                                     f"BW={best['bw']:.1f} | Clusters={best['n_clusters']} | "
-                                    f"Sil={best['sil']:.4f} | DBI={best['dbi']:.4f}"
+                                    f"Sil={best['silhouette']:.4f} | DBI={best['dbi']:.4f}"
                                 )
                             if isinstance(df_eval, pd.DataFrame) and not df_eval.empty:
                                 st.data_editor(
@@ -264,12 +264,12 @@ elif page == "Analisis":
                                 )
 
                             # menampilkan scatter plot nilai silhouette terbaik
-                            if best and X2 is not None:
+                            if best and X_pca is not None:
                                 st.write("Nilai Silhouette Terbaik")
-                                plot_clusters(X2, best["labels"], f"{group_name}")
+                                plot_clusters(X_pca, best["labels"], f"{group_name}")
 
                                 # === TABEL DAFTAR PEMAIN TIAP CLUSTER ===
-                                df_members = build_cluster_members_df(res, best)
+                                df_members = build_cluster_members_df(results, best)
                                 if isinstance(df_members, pd.DataFrame) and not df_members.empty:
                                     st.write("Daftar Pemain")
                                     st.data_editor(
@@ -283,22 +283,22 @@ elif page == "Analisis":
 
                             # init bar chart tiap fitur
                             try:
-                                feature_cols = get_features_for_group(group_name, FEATURES_BY_POS)
-                                bar_long = build_cluster_feature_bar_df(res, feature_cols)
+                                features = get_features_for_group(group_name, FEATURES_BY_POSITION)
+                                chart_data = build_cluster_feature_bar_df(results, features)
                             except BarDataMissing as e:
                                 st.info(f"Bar chart tidak dapat ditampilkan: {e}")
                             else:
-                                bar_long["Fitur"] = pd.Categorical(
-                                    bar_long["Fitur"],
-                                    categories=feature_cols,
+                                chart_data["Fitur"] = pd.Categorical(
+                                    chart_data["Fitur"],
+                                    categories=features,
                                     ordered=True
                                 )
-                                clusters_order = sorted(bar_long["Cluster"].unique(), key=lambda s: int(s[1:]))  # "C0","C1",...
-                                bar_long["Cluster"] = pd.Categorical(bar_long["Cluster"], categories=clusters_order, ordered=True)
+                                clusters_order = sorted(chart_data["Cluster"].unique(), key=lambda s: int(s[1:]))  # "C0","C1",...
+                                chart_data["Cluster"] = pd.Categorical(chart_data["Cluster"], categories=clusters_order, ordered=True)
 
                                 # tampilkan tiap fitur satu bar chart
-                                for fitur in feature_cols:
-                                    sub = bar_long[bar_long["Fitur"] == fitur]
+                                for fitur in features:
+                                    sub = chart_data[chart_data["Fitur"] == fitur]
                                     chart_title = FEATURE_LABELS.get(fitur, fitur)
                                     chart = (
                                         alt.Chart(sub)
@@ -356,9 +356,9 @@ elif page == "Analisis":
         st.session_state.setdefault("prev_club_filter", None)
 
         def _clear_reco_state():
-            st.session_state["recs_df"] = None
-            st.session_state["feat_df"] = None
-            st.session_state["cmp_target"] = None
+            st.session_state["recommend_state"] = None
+            st.session_state["features"] = None
+            st.session_state["compare_recommend"] = None
 
         def _clear_cluster_state():
             st.session_state["cluster_result"] = None
@@ -444,9 +444,9 @@ elif page == "Analisis":
                 st.markdown("---")
                 st.subheader("Pemain Rekomendasi")
                 
-                st.session_state.setdefault("recs_df", None)
-                st.session_state.setdefault("feat_df", None)
-                st.session_state.setdefault("cmp_target", None)
+                st.session_state.setdefault("recommend_state", None)
+                st.session_state.setdefault("features", None)
+                st.session_state.setdefault("compare_recommend", None)
 
                 recommend_count = st.slider(
                     "Jumlah pemain rekomendasi",
@@ -468,31 +468,31 @@ elif page == "Analisis":
                     diff_club = st.checkbox("Klub yang berbeda saja", value=False)
                 
                 if recommend_count and st.button("Cari pemain rekomendasi"):
-                    recs = get_recommend_similar_players(
+                    recommend_players = get_recommend_similar_players(
                         season=selected_season,
                         position_code=selected_position,
                         anchor_player=selected_player,
-                        top_n=recommend_count,
+                        recommend_count=recommend_count,
                         only_indonesian=only_indo,
                         filter_position=filter_position,
                         diff_club=diff_club
                     )
 
-                    if recs.empty:
+                    if recommend_players.empty:
                         st.info("Tidak ada pemain rekomendasi yang cocok untuk konfigurasi ini.")
-                        st.session_state["recs_df"] = None
-                        st.session_state["feat_df"] = None
-                        st.session_state["cmp_target"] = None
+                        st.session_state["recommend_state"] = None
+                        st.session_state["features"] = None
+                        st.session_state["compare_recommend"] = None
                     else:
-                        st.session_state["recs_df"] = recs
-                        st.session_state["feat_df"] = get_player_features_df(selected_season)
-                        st.session_state["cmp_target"] = None                                                                                
+                        st.session_state["recommend_state"] = recommend_players
+                        st.session_state["features"] = get_player_features_df(selected_season)
+                        st.session_state["compare_recommend"] = None                                                                                
 
-                recs_df = st.session_state.get("recs_df")
-                feat_df = st.session_state.get("feat_df")
+                recommend_state = st.session_state.get("recommend_state")
+                features = st.session_state.get("features")
 
                 # DAFTAR PEMAIN REKOMENDASI
-                if recs_df is not None and isinstance(recs_df, pd.DataFrame) and not recs_df.empty:
+                if recommend_state is not None and isinstance(recommend_state, pd.DataFrame) and not recommend_state.empty:
                     st.subheader("Hasil Pemain Rekomendasi")
                     col_head1, col_head2, col_head3, col_head4, col_head5, col_head6 = st.columns([3, 3, 2, 2, 2, 2])
                     col_head1.write("**Pemain**")
@@ -501,34 +501,34 @@ elif page == "Analisis":
                     col_head4.write("**Nationality**")
                     col_head5.write("**Kemiripan**")
 
-                    cols_show = ["player", "team", "position", "nationality", "similarity"]
-                    cols_show = [c for c in cols_show if c in recs_df.columns]
+                    recommend_columns = ["player", "team", "position", "nationality", "similarity"]
+                    recommend_column = [c for c in recommend_columns if c in recommend_state.columns]
 
-                    for i, ds in recs_df[cols_show].iterrows():
+                    for i, ds in recommend_state[recommend_column].iterrows():
                         col1, col2, col3, col4, col5, col6 = st.columns([3, 3, 2, 2, 2, 2])
 
-                        sim_pct = float(ds.get("similarity", 0.0))
-                        sim_pct = max(0.0, min(1.0, sim_pct)) * 100.0  
+                        similarity = float(ds.get("similarity", 0.0))
+                        similarity = max(0.0, min(1.0, similarity)) * 100.0  
 
                         col1.write(ds.get("player", "-"))
                         col2.write(ds.get("team", "-"))
                         col3.write(ds.get("position", "-"))
                         col4.write(ds.get("nationality", "-"))
-                        col5.write(f"{sim_pct:.2f}%")
+                        col5.write(f"{similarity:.2f}%")
 
                         # BUTTON BANDINGKAN PER PEMAIN
-                        if col6.button("Bandingkan", key=f"cmp_{i}_{ds.get('player','')}"):
-                            st.session_state["cmp_target"] = ds['player']
+                        if col6.button("Bandingkan", key=f"compare_{i}_{ds.get('player','')}"):
+                            st.session_state["compare_recommend"] = ds['player']
                     
-                    target_player = st.session_state["cmp_target"]
-                    if target_player and feat_df is not None:
+                    target_player = st.session_state["compare_recommend"]
+                    if target_player and features is not None:
                         with st.expander(f"Perbandingan {selected_player} dengan {target_player}", expanded=True):                                
                             try:
-                                long_df = prepare_comparison_long_df(
-                                    feat_df=feat_df,
+                                chart_data = prepare_comparison_chart_data(
+                                    features=features,
                                     anchor_player=selected_player,
                                     target_player=target_player,
-                                    features=FEATURES_TO_COMPARE
+                                    features_to_compare=FEATURES_TO_COMPARE
                                 )
                             except ValueError as e:
                                 st.error(str(e))
@@ -536,14 +536,14 @@ elif page == "Analisis":
                                 if not FEATURES_TO_COMPARE:
                                     st.warning("Daftar fitur kosong. Isi `FEATURES_TO_COMPARE` dulu.")
                                 else:
-                                    # menampilkan bar chart
+                                    # MENAMPILKAN BAR CHART
                                     N_COLS = 2
-                                    fitur_list = list(long_df["Fitur"].unique())
+                                    fitur_list = list(chart_data["Fitur"].unique())
                                     for start in range(0, len(fitur_list), N_COLS):
-                                        cols_plot = st.columns(N_COLS)
+                                        columns_plot = st.columns(N_COLS)
                                         batch = fitur_list[start:start+N_COLS]
-                                        for c, fitur in zip(cols_plot, batch):
-                                            sub = long_df[long_df["Fitur"] == fitur]
+                                        for c, fitur in zip(columns_plot, batch):
+                                            sub = chart_data[chart_data["Fitur"] == fitur]
                                             chart_title = FEATURE_LABELS.get(fitur, fitur)
                                             chart = (
                                                 alt.Chart(sub)

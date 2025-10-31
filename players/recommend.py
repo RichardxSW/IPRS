@@ -2,7 +2,7 @@ import math
 import re
 import numpy as np
 import pandas as pd
-from players.clustering import POS_GROUPS, run_meanshift_by_position
+from players.clustering import POSITION_GROUPS, run_meanshift_by_position
 from sklearn.metrics.pairwise import cosine_similarity
 
 # FITUR YANG AKAN DITAMPILKAN DALAM HASIL PERBANDINGAN
@@ -16,67 +16,60 @@ FEATURES_TO_COMPARE = [
 ]
 
 # MENGKATEGORIKAN POSISI KE PENYERANG, GELANDANG ATAU BERTAHAN
-def _group_for_position(pos_code: str) -> str | None:
-    p = str(pos_code).upper().strip()
-    for g, arr in POS_GROUPS.items():
-        if p in arr:
-            return g
+def _group_for_position(position_code: str) -> str | None:
+    position = str(position_code).upper().strip()
+    for group, positions in POSITION_GROUPS.items():
+        if position in positions:
+            return group
     return None
 
-def _pos_tokens(pos_str) -> set[str]:
-    """Ubah string posisi jadi set token huruf besar (spasi, /, -, koma, dll)."""
-    if pos_str is None:
+# Ubah posisi jadi (huruf besar, spasi, /, -, koma).
+def _format_position(position_str) -> set[str]:    
+    if position_str is None:
         return set()
-    if isinstance(pos_str, float) and math.isnan(pos_str):
+    if isinstance(position_str, float) and math.isnan(position_str):
         return set()
-    s = str(pos_str).upper()
-    tokens = [t for t in re.split(r"[^A-Z]+", s) if t]
-    return set(tokens)
+    string = str(position_str).upper()
+    position = [i for i in re.split(r"[^A-Z]+", string) if i]
+    return set(position)
 
 # FILTER POSISI
-def _matches_position(pos_str: str, anchor_tokens: set[str]) -> bool:
-    """True kalau ada minimal satu token posisi yang sama dengan anchor."""
-    tokens = _pos_tokens(pos_str)
-    return bool(tokens & anchor_tokens)
+def _matches_position(position_str: str, anchor_position: set[str]) -> bool:
+    positions = _format_position(position_str)
+    return bool(positions & anchor_position)
 
 # MENCARI PEMAIN REKOMENDASI DAN MENGHITUNG COSINE SIMILARITY
 def get_recommend_similar_players(
     season: str,
     position_code: str,
     anchor_player: str,
-    top_n: int = 5,
+    recommend_count: int = 10,
     only_indonesian: bool = False,
     filter_position: bool = False,
     diff_club: bool = False
 ):
-    """
-    Rekomendasi berbasis cosine:
-    - pakai grup sesuai position_code,
-    - pakai konfigurasi cluster dengan silhouette terbaik,
-    - top-N dari cluster yang sama dengan anchor.
-    """
     group = _group_for_position(position_code)
     if not group:
         raise ValueError("Kode posisi tidak valid.")
 
     all_results = run_meanshift_by_position(season)
-    res = all_results.get(group)
-    if not res or not res.get("best_sil"):
+    results = all_results.get(group)
+    if not results or not results.get("best_silhouette"):
         return pd.DataFrame()
 
-    labels = res["best_sil"]["labels"]
-    Xs = res["Xs"]
-    meta = res["meta"].copy()
+    labels = results["best_silhouette"]["labels"]
+    X_scaled = results["X_scaled"]
+    players = results["players"].copy()
 
     # cari pemain acuan
-    anchor_mask = meta["player"].str.lower() == str(anchor_player).lower()
-    if not anchor_mask.any():
+    anchor = players["player"].str.lower() == str(anchor_player).lower()
+    if not anchor.any():
         return pd.DataFrame()
 
-    anchor_idx = int(meta[anchor_mask].index[0])
+    anchor_idx = int(players[anchor].index[0])
     anchor_cluster = int(labels[anchor_idx])
-    anchor_pos_str = meta.loc[anchor_idx, "position"]
-    anchor_tokens = _pos_tokens(anchor_pos_str)
+    anchor_position_str = players.loc[anchor_idx, "position"]
+    anchor_position = _format_position(anchor_position_str)
 
     # ambil hanya pemain dalam cluster yang sama
     same_idx = np.where(labels == anchor_cluster)[0]
@@ -84,67 +77,60 @@ def get_recommend_similar_players(
         return pd.DataFrame()
 
     # filter Pemain Indonesia saja
-    if "nationality" in meta.columns and only_indonesian:
-        same_idx = [i for i in same_idx if str(meta.loc[i, "nationality"]).strip().lower() == "indonesia"]
+    if "nationality" in players.columns and only_indonesian:
+        same_idx = [i for i in same_idx if str(players.loc[i, "nationality"]).strip().lower() == "indonesia"]
         if len(same_idx) <= 1:
             return pd.DataFrame()
 
     # FILTER POSISI YANG SAMA DENGAN PEMAIN ACUAN
-    if "position" in meta.columns and filter_position:
-        same_idx = [j for j in same_idx if _matches_position(meta.loc[j, "position"], anchor_tokens)]
+    if "position" in players.columns and filter_position:
+        same_idx = [j for j in same_idx if _matches_position(players.loc[j, "position"], anchor_position)]
 
 
     # hitung cosine similarity antara pemain acuan dan pemain dalam cluster yg sama
-    anchor_vec = Xs[anchor_idx:anchor_idx+1]
-    cluster_vecs = Xs[same_idx]
+    anchor_vec = X_scaled[anchor_idx:anchor_idx+1]
+    cluster_vecs = X_scaled[same_idx]
     sims = cosine_similarity(anchor_vec, cluster_vecs).ravel()
 
-    out = meta.iloc[same_idx].copy()
+    out = players.iloc[same_idx].copy()
     out["similarity"] = sims
 
     # MEMBUANG PEMAIN ACUAN
     out = out[out.index != anchor_idx]
 
     # FILTER KLUB
-    if diff_club and "team" in meta.columns:
-        anchor_team = str(meta.loc[anchor_idx, "team"]).strip().lower()
+    if diff_club and "team" in players.columns:
+        anchor_team = str(players.loc[anchor_idx, "team"]).strip().lower()
         out = out[out["team"].str.strip().str.lower() != anchor_team]
         
-    out = out.sort_values("similarity", ascending=False).head(top_n)
+    out = out.sort_values("similarity", ascending=False).head(recommend_count)
 
     return out.reset_index(drop=True)
 
 # MEMBACA FITUR UNTUK YANG DIPAKAI UNTUK PEMAIN ACUAN DAN PEMAIN REKOMENDASI
 def get_feature_rows(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> tuple[pd.Series, pd.Series]:
-    cols = ["player", *features]
-    a = feat_df.loc[feat_df["player"] == anchor_player, cols]
-    t = feat_df.loc[feat_df["player"] == target_player, cols]
-    if a.empty:
-        raise ValueError(f"Data fitur anchor '{anchor_player}' tidak ditemukan.")
-    if t.empty:
-        raise ValueError(f"Data fitur '{target_player}' tidak ditemukan.")
-    return a.iloc[0], t.iloc[0]
+    position_features = ["player", *features]
+    anchor = feat_df.loc[feat_df["player"] == anchor_player, position_features]
+    recommend = feat_df.loc[feat_df["player"] == target_player, position_features]
+    if anchor.empty:
+        raise ValueError(f"Data fitur pemain acuan '{anchor_player}' tidak ditemukan.")
+    if recommend.empty:
+        raise ValueError(f"Data fitur pemain rekomendasi '{target_player}' tidak ditemukan.")
+    return anchor.iloc[0], recommend.iloc[0]
 
 # ==================================================================================================================================
 # UNTUK MEMBUAT CHART PERBANDINGAN
-def build_long_compare_df(anchor_row: pd.Series, target_row: pd.Series, features: list[str]) -> pd.DataFrame:
-    """
-    Kembalikan long-form dataframe: kolom = Fitur, Pemain, Nilai.
-    Cocok untuk di-plot grouped bar (Anchor vs Target) per fitur.
-    """
+def build_long_compare_df(anchor_row: pd.Series, recommend_row: pd.Series, features: list[str]) -> pd.DataFrame:
     df = pd.DataFrame({
         "Fitur": features,
         anchor_row["player"]: [anchor_row[f] for f in features],
-        target_row["player"]: [target_row[f] for f in features],
+        recommend_row["player"]: [recommend_row[f] for f in features],
     })
-    long_df = df.melt(id_vars="Fitur", var_name="Pemain", value_name="Nilai")
-    return long_df
+    chart_data = df.melt(id_vars="Fitur", var_name="Pemain", value_name="Nilai")
+    return chart_data
 
-def prepare_comparison_long_df(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> pd.DataFrame:
-    """
-    Satu pintu: ambil baris → bentuk long-form → kembalikan ke UI.
-    """
-    a_row, t_row = get_feature_rows(feat_df, anchor_player, target_player, features)
-    return build_long_compare_df(a_row, t_row, features)
+def prepare_comparison_chart_data(features: pd.DataFrame, anchor_player: str, target_player: str, features_to_compare: list[str]) -> pd.DataFrame:
+    anchor_row, recommend_row = get_feature_rows(features, anchor_player, target_player, features_to_compare)
+    return build_long_compare_df(anchor_row, recommend_row, features_to_compare)
 
 # ==================================================================================================================================

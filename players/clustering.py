@@ -10,13 +10,13 @@ from .models import Player
 # =============================
 # FITUR YANG TERPAKAI UNTUK CLUSTERING
 # =============================
-POS_GROUPS = {
+POSITION_GROUPS = {
     "Pemain Penyerang": ["ST", "LW", "RW"],
     "Pemain Gelandang": ["AM", "CM", "DM", "LM", "RM"],
     "Pemain Bertahan": ["CB", "LB", "RB"],
 }
 
-FEATURES_BY_POS = {
+FEATURES_BY_POSITION = {
     "Pemain Penyerang": [
         "goal_per_game", "shot_per_game", "sot_per_game",
         "assist_per_game", "successful_dribble_per_game", "successful_crossing_per_game",
@@ -36,7 +36,7 @@ FEATURES_BY_POS = {
 }
 
 # FITUR YANG TIDAK TERPAKAI UNTUK CLUSTERING
-META_COLS = [
+META_COLUMNS = [
     "id", "player", "team", "position", "nationality",
     "age", "appearance", "total_minute",
     "total_goal", "assist", "error"
@@ -70,11 +70,11 @@ FEATURE_LABELS = {
 # MENGAMBIL DATA FITUR FITUR PEMAIN
 # =============================
 def get_player_features_df(season: str) -> pd.DataFrame:
-    all_feature = sorted({f for feats in FEATURES_BY_POS.values() for f in feats})
+    all_feature = sorted({f for feats in FEATURES_BY_POSITION.values() for f in feats})
     qs = (
         Player.objects
         .filter(season__season=season)
-        .values(*META_COLS, *all_feature)
+        .values(*META_COLUMNS, *all_feature)
         .order_by("player")
     )
     return pd.DataFrame(list(qs))
@@ -91,14 +91,14 @@ def _prepare_matrix(df: pd.DataFrame, feat_cols):
 
     X_scaled = StandardScaler().fit_transform(X)    
     X_pca = PCA(n_components=2).fit_transform(X_scaled)
-    return X_pca, X_scaled
+    return X_scaled, X_pca
 
 # =============================
 # MEAN SHIFT CLUSTERING
 # =============================
-def run_meanshift(df: pd.DataFrame, feat_cols):
+def run_meanshift(df: pd.DataFrame, features):
     #PREPROSES
-    X_scaled, X_pca = _prepare_matrix(df, feat_cols)
+    X_scaled, X_pca = _prepare_matrix(df, features)
 
     # BANDWIDTH
     bandwidths = np.arange(0.5, 5.5, 0.5)
@@ -121,11 +121,11 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
                 raise Exception("Clustering gagal")
 
         # EVALUASI
-        sil, dbi = None, None
+        silhouette, dbi = None, None
         if labels is not None and n_clusters >= 2:
             try:
                 # NILAI SILHOUTTE
-                sil = float(silhouette_score(X_pca, labels))
+                silhouette = float(silhouette_score(X_pca, labels))
             except Exception:
                 pass
             try:
@@ -138,82 +138,76 @@ def run_meanshift(df: pd.DataFrame, feat_cols):
             "bw": float(bw),
             "labels": labels,
             "n_clusters": n_clusters,
-            "sil": sil,
+            "silhouette": silhouette,
             "dbi": dbi,            
         })
 
-    df_eval = pd.DataFrame([{
+    cluster_result = pd.DataFrame([{
         "Bandwidth": r["bw"],
         "Jumlah Cluster": r["n_clusters"],
-        "Silhouette": r["sil"],
+        "Silhouette": r["silhouette"],
         "DBI": r["dbi"],        
     } for r in results])
 
-    valid_sil = [r for r in results if r["sil"] is not None]
+    valid_silhouette = [r for r in results if r["silhouette"] is not None]
     valid_dbi = [r for r in results if r["dbi"] is not None]
-    best_sil = max(valid_sil, key=lambda r: r["sil"]) if valid_sil else None
+    best_silhouette = max(valid_silhouette, key=lambda r: r["silhouette"]) if valid_silhouette else None
     best_dbi = min(valid_dbi, key=lambda r: r["dbi"]) if valid_dbi else None
-    same_bw = best_sil and best_dbi and best_sil["bw"] == best_dbi["bw"]
+    same_bw = best_silhouette and best_dbi and best_silhouette["bw"] == best_dbi["bw"]
 
     return {
-        "res_table": df_eval,
-        "pca": X_pca,
-        "Xs": X_scaled,
-        "meta": df.reset_index(drop=True),
-        "df": df.reset_index(drop=True),
-        "feature_df": df[feat_cols].reset_index(drop=True),
-        "best_sil": best_sil,
+        "cluster_result": cluster_result,
+        "X_pca": X_pca,
+        "X_scaled": X_scaled,
+        "players": df.reset_index(drop=True),
+        "features": df[features].reset_index(drop=True),
+        "best_silhouette": best_silhouette,
         "best_dbi": best_dbi,
         "same_bw": same_bw,
     }
 
 # MENJALANKAN MEAN SHIFT PER KATEGORI POSISI PEMAIN
 def run_meanshift_by_position(season: str):
-    """
-    Jalankan clustering per kategori posisi
-    dengan fitur yang disesuaikan untuk tiap kategori.
-    """
-    df_all = get_player_features_df(season)
-    if df_all.empty:
+    players = get_player_features_df(season)
+    if players.empty:
         return {"Forward": None, "Midfielder": None, "Defender": None}
 
     results = {}
-    for group, positions in POS_GROUPS.items():
-        df_by_position = df_all[df_all["position"].apply(
+    for group, positions in POSITION_GROUPS.items():
+        player_by_position = players[players["position"].apply(
             lambda p: any(pos in str(p).upper().replace(" ", "").split(",") or
                           pos in str(p).upper().replace(" ", "") for pos in positions)
         )]
-        feat_columns = FEATURES_BY_POS[group]
-        if len(df_by_position) < 3:
+        features = FEATURES_BY_POSITION[group]
+        if len(player_by_position) < 3:
             results[group] = None
             continue
-        results[group] = run_meanshift(df_by_position, feat_columns)
+        results[group] = run_meanshift(player_by_position, features)
 
     return results
 
 # UNTUK MEMBUAT DAFTAR PEMAIN PER CLUSTER
-def build_cluster_members_df(res: dict, best: dict):
+def build_cluster_members_df(result: dict, best: dict):
     if not best or "labels" not in best:
         return None
 
     labels = np.asarray(best["labels"])
-
-    df_players = res.get("df")
-    if not isinstance(df_players, pd.DataFrame) or "player" not in df_players.columns:
+    players = result.get("players")
+    if not isinstance(players, pd.DataFrame) or "player" not in players.columns:
         return None
 
-    df_players = df_players.reset_index(drop=True)
-    if len(df_players) != len(labels):
+    players = players.reset_index(drop=True)
+    if len(players) != len(labels):
         return None
 
-    tmp = df_players[["player"]].copy()
+    player_name = players[["player"]].copy()
     try:
-        tmp["ClusterId"] = labels.astype(int)
+        player_name["ClusterId"] = labels.astype(int)
     except Exception:
-        tmp["ClusterId"] = labels
+        player_name["ClusterId"] = labels
 
     grouped = (
-        tmp.groupby("ClusterId")["player"]
+        player_name.groupby("ClusterId")["player"]
         .apply(list)
         .to_dict()
     )
@@ -222,9 +216,9 @@ def build_cluster_members_df(res: dict, best: dict):
     max_len = max(len(v) for v in grouped.values()) if grouped else 0
 
     data = {}
-    for cid in ordered_ids:
-        col_name = f"Cluster {cid}"
-        vals = grouped[cid]
+    for i in ordered_ids:
+        col_name = f"Cluster {i}"
+        vals = grouped[i]
         if len(vals) < max_len:
             vals = vals + [""] * (max_len - len(vals))
         data[col_name] = vals
