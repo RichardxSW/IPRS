@@ -18,20 +18,18 @@ POSITION_GROUPS = {
 
 FEATURES_BY_POSITION = {
     "Pemain Penyerang": [
-        "goal_per_game", "shot_per_game", "sot_per_game",
-        "assist_per_game", "successful_dribble_per_game", "successful_crossing_per_game",
-        "key_pass_per_game", "total_duel_per_game", "aerial_duel_per_game"
+        "goal_per_game", "shot_per_game", "sot_per_game", "assist_per_game", "successful_dribble_per_game", 
+        "successful_crossing_per_game", "key_pass_per_game", 
+        "aerial_duel_per_game", "total_duel_per_game",
     ],
     "Pemain Gelandang": [
-        "goal_per_game", "shot_per_game", "sot_per_game", 
-        "assist_per_game", "key_pass_per_game", "successful_pass_per_game",
-        "long_ball_per_game", "successful_dribble_per_game", "aerial_duel_per_game", "successful_crossing_per_game",
-        "ball_recovered_per_game", "total_duel_per_game", "dribbled_past_per_game", "clearance_per_game"
+        "goal_per_game", "shot_per_game", "sot_per_game", "assist_per_game", "successful_dribble_per_game", 
+        "successful_crossing_per_game", "key_pass_per_game", "successful_pass_per_game", "long_ball_per_game", 
+        "aerial_duel_per_game",  "total_duel_per_game", "ball_recovered_per_game", "dribbled_past_per_game", "clearance_per_game"
     ],
     "Pemain Bertahan": [
-        "clearance_per_game", "ball_recovered_per_game",
-        "dribbled_past_per_game", "successful_dribble_per_game",
-        "aerial_duel_per_game", "total_duel_per_game"
+        "successful_dribble_per_game", "successful_crossing_per_game", "key_pass_per_game",
+        "aerial_duel_per_game", "total_duel_per_game", "ball_recovered_per_game", "dribbled_past_per_game", "clearance_per_game",         
     ],
 }
 
@@ -69,7 +67,7 @@ FEATURE_LABELS = {
 # =============================
 # MENGAMBIL DATA FITUR FITUR PEMAIN
 # =============================
-def get_player_features_df(season: str) -> pd.DataFrame:
+def get_player_features_data(season: str) -> pd.DataFrame:
     all_feature = sorted({f for feats in FEATURES_BY_POSITION.values() for f in feats})
     qs = (
         Player.objects
@@ -125,7 +123,7 @@ def run_meanshift(df: pd.DataFrame, features):
         if labels is not None and n_clusters >= 2:
             try:
                 # NILAI SILHOUTTE
-                silhouette = float(silhouette_score(X_pca, labels))
+                silhouette = float(silhouette_score(X_scaled, labels))
             except Exception:
                 pass
             try:
@@ -145,12 +143,12 @@ def run_meanshift(df: pd.DataFrame, features):
     cluster_result = pd.DataFrame([{
         "Bandwidth": r["bw"],
         "Jumlah Cluster": r["n_clusters"],
-        "Silhouette": r["silhouette"],
-        "DBI": r["dbi"],        
+        "Silhouette": f"{r['silhouette']:.4f}" if r["silhouette"] is not None else "-",
+        "DBI": f"{r["dbi"]:.4f}" if r["dbi"] is not None else '-',
     } for r in results])
 
-    valid_silhouette = [r for r in results if r["silhouette"] is not None]
-    valid_dbi = [r for r in results if r["dbi"] is not None]
+    valid_silhouette = [r for r in results if r["silhouette"] is not None and r["n_clusters"] != '-']
+    valid_dbi = [r for r in results if r["dbi"] and r['dbi'] is not None != '-']
     best_silhouette = max(valid_silhouette, key=lambda r: r["silhouette"]) if valid_silhouette else None
     best_dbi = min(valid_dbi, key=lambda r: r["dbi"]) if valid_dbi else None
     same_bw = best_silhouette and best_dbi and best_silhouette["bw"] == best_dbi["bw"]
@@ -168,7 +166,7 @@ def run_meanshift(df: pd.DataFrame, features):
 
 # MENJALANKAN MEAN SHIFT PER KATEGORI POSISI PEMAIN
 def run_meanshift_by_position(season: str):
-    players = get_player_features_df(season)
+    players = get_player_features_data(season)
     if players.empty:
         return {"Forward": None, "Midfielder": None, "Defender": None}
 
@@ -187,7 +185,7 @@ def run_meanshift_by_position(season: str):
     return results
 
 # UNTUK MEMBUAT DAFTAR PEMAIN PER CLUSTER
-def build_cluster_members_df(result: dict, best: dict):
+def get_cluster_members_data(result: dict, best: dict):
     if not best or "labels" not in best:
         return None
 

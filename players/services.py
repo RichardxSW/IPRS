@@ -25,6 +25,45 @@ POSITION_CHOICES = [
     "RB"
 ]
 
+TEMPLATE_DATA = {
+        "Player": ["Marc Klok", np.nan],
+        "Team": ["Persib Bandung", np.nan],
+        "Nationality": ["Indonesia",np.nan],
+        "Position": ["DM", np.nan],
+        "Age": [25, np.nan],
+        "Appearance": [34, np.nan],
+        "Total Minute": [3060, np.nan],
+        "Total Goal": [10, np.nan],
+        "Goal/game": [1,np.nan],
+        "Shot/game": [1, np.nan],
+        "SoT/game": [1, np.nan],
+        "Assist": [5, np.nan],
+        "Assist/game": [1, np.nan],
+        "Success Dribble/game": [8, np.nan],
+        "Key Pass/game": [5, np.nan],
+        "Successful Pass/game": [20, np.nan],
+        "Long Ball/game": [10, np.nan],
+        "Successful Crossing/game": [10, np.nan],
+        "Ball Recovered/game": [10, np.nan],
+        "Dribbled Past/game": [5, np.nan],
+        "Clearance/game": [5,np.nan],
+        "Error leading to shot": [5, np.nan],
+        "Error leading to shot/game": [5, np.nan],
+        "Total duel won/game": [5, np.nan],
+        "Aerial duel won/game": [5, np.nan],
+    }
+
+def clear_recommend_state(st):
+    st.session_state["recommend_state"] = None
+    st.session_state["features"] = None
+    st.session_state["compare_recommend"] = None
+    return st
+
+def clear_cluster_state(st):
+    st.session_state["cluster_result"] = None
+    st.session_state["selected_season"] = None
+    return st
+
 #VALIDASI FITUR PADA DATASET
 def get_required(row, columns, key, string=False):
     if key not in columns:
@@ -40,7 +79,7 @@ def get_required(row, columns, key, string=False):
 
 # POST DATASET KE DATABASE
 @transaction.atomic
-def insert_dataset_and_players(league_name: str, season: str, df: pd.DataFrame) -> int:
+def post_dataset(league_name: str, season: str, df: pd.DataFrame) -> int:
     column = {c.lower(): c for c in df.columns}
 
     # validasi format musim
@@ -163,7 +202,7 @@ def get_players_by_season_and_club(season: str, position: str, club: str) -> Lis
         season__season=season,
         position__icontains=position,
     )
-    if club and club.lower() != "semua klub":
+    if club and club.lower() != "semua":
         qs = qs.filter(team__iexact=club)
 
     players = list(qs.order_by("player").values_list("player", flat=True))
@@ -171,34 +210,8 @@ def get_players_by_season_and_club(season: str, position: str, club: str) -> Lis
     return players
 
 # DOWNLOAD TEMPLATE DATASET
-def make_template_excel_bytes() -> bytes:
-    template = pd.DataFrame({
-        "Player": ["Marc Klok", np.nan],
-        "Team": ["Persib Bandung", np.nan],
-        "Nationality": ["Indonesia", np.nan],
-        "Position": ["DM", np.nan],
-        "Age": [25, np.nan],
-        "Appearance": [34, np.nan],
-        "Total Minute": [3060, np.nan],
-        "Total Goal": [10, np.nan],
-        "Goal/game": [1, np.nan],
-        "Shot/game": [1, np.nan],
-        "SoT/game": [1, np.nan],
-        "Assist": [5, np.nan],
-        "Assist/game": [1, np.nan],
-        "Success Dribble/game": [8, np.nan],
-        "Key Pass/game": [5, np.nan],
-        "Successful Pass/game": [20, np.nan],
-        "Long Ball/game": [10, np.nan],
-        "Successful Crossing/game": [10, np.nan],
-        "Ball Recovered/game": [10, np.nan],
-        "Dribbled Past/game": [5, np.nan],
-        "Clearance/game": [5,np.nan],
-        "Error leading to shot": [5, np.nan],
-        "Error leading to shot/game": [5, np.nan],
-        "Total duel won/game": [5, np.nan],
-        "Aerial duel won/game": [5, np.nan],
-    })
+def build_template_file() -> bytes:
+    template = pd.DataFrame(TEMPLATE_DATA)
 
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:

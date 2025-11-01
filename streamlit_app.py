@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import altair as alt
 
-from players.bar_chart import BarDataMissing, build_cluster_feature_bar_df, get_features_for_group
+from players.bar_chart import BarDataMissing, get_cluster_feature_chart_data, get_features_for_group
 
 # === INIT DJANGO
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -15,11 +15,11 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
 import django
 django.setup()
 
-from players.clustering import FEATURE_LABELS, FEATURES_BY_POSITION, build_cluster_members_df, get_player_features_df, run_meanshift_by_position
+from players.clustering import FEATURE_LABELS, FEATURES_BY_POSITION, get_cluster_members_data, get_player_features_data, run_meanshift_by_position
 from players.services import (
-    POSITION_CHOICES, delete_dataset, get_clubs_by_season, get_list_of_season, get_player_detail, get_players_by_season_and_club, insert_dataset_and_players, get_seasons, get_players_by_season, make_template_excel_bytes
+    POSITION_CHOICES, TEMPLATE_DATA, clear_cluster_state, clear_recommend_state, delete_dataset, get_clubs_by_season, get_list_of_season, get_player_detail, get_players_by_season_and_club, post_dataset, get_seasons, get_players_by_season, build_template_file
 )
-from players.recommend import FEATURES_TO_COMPARE, get_recommend_similar_players, prepare_comparison_chart_data
+from players.recommend import FEATURES_TO_COMPARE, get_recommend_similar_players, get_comparison_chart_data
 
 st.set_page_config(page_title="IPRS", layout="wide")
 
@@ -70,54 +70,27 @@ if page == "Beranda":
         """
     )
     st.write("- **Unggah Dataset** → Download template dataset dan menyimpan data liga dan pemain.")
-    st.write("- **Analisis** → Pilih musim, lakukan clustering, mencari pemain rekomendasi, dan membandingkan pemain acuan dan pemain rekmendasi.")
+    st.write("- **Analisis** → Jalankan clustering, mencari pemain rekomendasi, dan membandingkan pemain acuan dengan pemain rekmendasi.")
     st.write("- **About** → Lihat lebih lanjut tentang pembuat dan website.")
     st.markdown("---")
 
+# =============================
 # HALAMAN UNGGAH DATASET
+# =============================
 elif page == "Unggah Dataset":
-    st.header("Template Dataset")
+    st.header("Template Dataset")    
 
-    # TEMPLATE DATA
-    data = {
-        "Player": ["Marc Klok", np.nan],
-        "Team": ["Persib Bandung", np.nan],
-        "Nationality": ["Indonesia",np.nan],
-        "Position": ["DM", np.nan],
-        "Age": [25, np.nan],
-        "Appearance": [34, np.nan],
-        "Total Minute": [3060, np.nan],
-        "Total Goal": [10, np.nan],
-        "Goal/game": [1,np.nan],
-        "Shot/game": [1, np.nan],
-        "SoT/game": [1, np.nan],
-        "Assist": [5, np.nan],
-        "Assist/game": [1, np.nan],
-        "Success Dribble/game": [8, np.nan],
-        "Key Pass/game": [5, np.nan],
-        "Successful Pass/game": [20, np.nan],
-        "Long Ball/game": [10, np.nan],
-        "Successful Crossing/game": [10, np.nan],
-        "Ball Recovered/game": [10, np.nan],
-        "Dribbled Past/game": [5, np.nan],
-        "Clearance/game": [5,np.nan],
-        "Error leading to shot": [5, np.nan],
-        "Error leading to shot/game": [5, np.nan],
-        "Total duel won/game": [5, np.nan],
-        "Aerial duel won/game": [5, np.nan],
-    }
-
-# DOWNLOAD FILE TEMPLATE DATASET
-    df = pd.DataFrame(data)
-    st.dataframe(df)
+    # DOWNLOAD FILE TEMPLATE DATASET
+    df = pd.DataFrame(TEMPLATE_DATA)
+    st.dataframe(df.fillna(""))
     st.download_button(
         "Download Template",
-        data=make_template_excel_bytes(),
+        data=build_template_file(),
         file_name=f"template_dataset_{dt.datetime.now():%Y%m%d}.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
-# UPLOAD FILE DATASET
+    # UPLOAD FILE DATASET
     st.markdown("---")
     st.header("Unggah Dataset")
     with st.form("upload_form"):
@@ -137,7 +110,7 @@ elif page == "Unggah Dataset":
                 st.error("Unggah file dataset terlebih dahulu.")
             else:
                 df = pd.read_excel(file)
-                insert_dataset_and_players(league_name, season, df)
+                post_dataset(league_name, season, df)
                 st.success(f"Sukses menyimpan dataset: {league_name} – {season}.")
                 st.rerun()
         except KeyError as ke:
@@ -153,6 +126,7 @@ elif page == "Unggah Dataset":
 
     seasons = get_list_of_season()
 
+    # YANG DITAMPILKAN JIKA BELOM ADA DATA YANG DISIMPAN
     if not seasons:
         st.info("Belum ada data yang tersimpan")
     else:
@@ -178,25 +152,18 @@ elif page == "Unggah Dataset":
                 else:
                     st.error("Gagal menghapus data liga.")
 
+# ================================
 # HALAMAN ANALISIS
+# ================================
 elif page == "Analisis":
     st.header("Analisis")
 
-    # ==== HELPER UNTUK RESET STATE ====
+    # UNTUK RESET STATE
     st.session_state.setdefault("recommend_state", None)
     st.session_state.setdefault("features", None)
     st.session_state.setdefault("compare_recommend", None)
     st.session_state.setdefault("cluster_result", None)
-    st.session_state.setdefault("selected_season", None)
-
-    def _clear_reco_state():
-        st.session_state["recommend_state"] = None
-        st.session_state["features"] = None
-        st.session_state["compare_recommend"] = None
-
-    def _clear_cluster_state():
-        st.session_state["cluster_result"] = None
-        st.session_state["selected_season"] = None
+    st.session_state.setdefault("selected_season", None)    
 
     seasons = get_seasons()
     if not seasons:
@@ -211,158 +178,177 @@ elif page == "Analisis":
 
         if selected_season != "Pilih Musim":            
             if st.button("Clustering"):
-                _clear_reco_state()
+                clear_recommend_state(st)
                 with st.spinner("Sedang menjalankan clustering..."):
                     result = run_meanshift_by_position(selected_season)
                 st.session_state.cluster_result = result
                 st.session_state.selected_season = selected_season                
                 st.success("Clustering berhasil.")
 
-        # HASIL CLUSTERING
+        # === HASIL CLUSTERING ===
         results = st.session_state.get("cluster_result")
         if results and st.session_state.get("selected_season") == selected_season:
-            with st.expander("Hasil Clustering"):
+            with st.expander("Hasil Clustering", expanded=False):
                 group_items = list(results.items())
-                N_COLS = 3
+                group_names = [g for g, _ in group_items]
 
-                def plot_clusters(X_pca, labels, title):
-                    fig, ax = plt.subplots(figsize=(4,3))
-                    sc = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=labels, s=28, alpha=0.9)
-                    ax.set_xlabel("PCA 1"); ax.set_ylabel("PCA 2")
-                    ax.set_title(title)
-                    uniq, counts = np.unique(labels, return_counts=True)
-                    ax.legend(sc.legend_elements()[0], [f"C{c}: {n}" for c,n in zip(uniq, counts)], loc="best")
-                    st.pyplot(fig)
-                    plt.close(fig)
+                tabs = st.tabs(group_names)
 
-                # tampilkan per posisi
-                for start in range(0, len(group_items), N_COLS):
-                    columns = st.columns(N_COLS)
-                    for c, (group_name, results) in zip(columns, group_items[start:start+N_COLS]):
-                        with c:
-                            st.markdown(f"### {group_name}")
-                            if not results:
-                                st.warning(f"Tidak cukup data untuk posisi {group_name.lower()}.")
-                                continue
+                for (group_name, group_result), tab in zip(group_items, tabs):
+                    with tab:
+                        st.markdown(f"### Hasil Clustering {group_name}")
+                        if not group_result:
+                            st.warning(f"Tidak cukup data untuk posisi {group_name.lower()}.")
+                            continue
 
-                            df_eval = results["cluster_result"]
-                            X_pca = results["X_pca"]
-                            best = results["best_silhouette"]
+                        cluster_result = group_result.get("cluster_result")
+                        X_pca   = group_result.get("X_pca")
+                        best_result    = group_result.get("best_silhouette")
 
-                            # tabel hasil loop clustering dengan bandwidth dari 0,5 - 5
-                            if best:
-                                st.caption(
-                                    f"BW={best['bw']:.1f} | Clusters={best['n_clusters']} | "
-                                    f"Sil={best['silhouette']:.4f} | DBI={best['dbi']:.4f}"
-                                )
-                            if isinstance(df_eval, pd.DataFrame) and not df_eval.empty:
+                        # NILAI SILHOUETTE TERBAIK
+                        if best_result:
+                            st.write(
+                                f"BW = {best_result['bw']:.1f} | Clusters = {best_result['n_clusters']} | "
+                                f"Silhouette = {best_result['silhouette']:.4f} | DBI = {best_result['dbi']:.4f}"
+                            )
+                        st.markdown("---")
+
+                        c1, c2, c3 = st.columns([1, 1, 1], vertical_alignment="top")
+
+                        # TABEL HASIL EVALUASI CLUSTERING 
+                        with c1:
+                            st.write("##### Evaluasi Clustering")
+                            if isinstance(cluster_result, pd.DataFrame) and not cluster_result.empty:
                                 st.data_editor(
-                                    df_eval.reset_index(drop=True),
+                                    cluster_result.reset_index(drop=True),
                                     hide_index=True,
                                     disabled=True,
-                                    height=180
+                                    height=380,                                    
                                 )
+                            else:
+                                st.info("Belum ada evaluasi bandwidth.")
 
-                            # menampilkan scatter plot nilai silhouette terbaik
-                            if best and X_pca is not None:
-                                st.write("Nilai Silhouette Terbaik")
-                                plot_clusters(X_pca, best["labels"], f"{group_name}")
+                        # GRAFIK HASIL CLUSTERING DENGAN NILAI SILHOUETTE TERBAIK
+                        with c2:
+                            st.write("##### Nilai Silhouette Terbaik")
+                            if best_result and X_pca is not None:
+                                fig, ax = plt.subplots(figsize=(4,3))
+                                sc = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=best_result["labels"], s=16, alpha=0.85)
+                                ax.set_xlabel("PCA 1"); ax.set_ylabel("PCA 2")
+                                ax.set_title(f"{group_name}")
+                                uniq, counts = np.unique(best_result["labels"], return_counts=True)
+                                ax.legend(sc.legend_elements()[0], [f"C{c}: {n}" for c, n in zip(uniq, counts)], loc="best")
+                                st.pyplot(fig, width=720)
+                                plt.close(fig)
+                            else:
+                                st.info("Plot tidak tersedia.")
 
-                                # === TABEL DAFTAR PEMAIN TIAP CLUSTER ===
-                                df_members = build_cluster_members_df(results, best)
+                        # TABEL DAFTAR PEMAIN TIAP CLUSTER
+                        with c3:
+                            st.write("##### Daftar Pemain")
+                            if best_result:
+                                df_members = get_cluster_members_data(group_result, best_result)
                                 if isinstance(df_members, pd.DataFrame) and not df_members.empty:
-                                    st.write("Daftar Pemain")
                                     st.data_editor(
                                         df_members,
                                         hide_index=True,
                                         disabled=True,
-                                        height=260,
+                                        height=420,                                        
                                     )
                                 else:
                                     st.info("Daftar pemain per cluster tidak ditemukan.")
-
-                            # init bar chart tiap fitur
-                            try:
-                                features = get_features_for_group(group_name, FEATURES_BY_POSITION)
-                                chart_data = build_cluster_feature_bar_df(results, features)
-                            except BarDataMissing as e:
-                                st.info(f"Bar chart tidak dapat ditampilkan: {e}")
                             else:
-                                chart_data["Fitur"] = pd.Categorical(
-                                    chart_data["Fitur"],
-                                    categories=features,
-                                    ordered=True
-                                )
-                                clusters_order = sorted(chart_data["Cluster"].unique(), key=lambda s: int(s[1:]))  # "C0","C1",...
-                                chart_data["Cluster"] = pd.Categorical(chart_data["Cluster"], categories=clusters_order, ordered=True)
+                                st.info("Nilai silhouette terbaik tidak ditemukan.")
 
-                                # tampilkan tiap fitur satu bar chart
-                                for fitur in features:
-                                    sub = chart_data[chart_data["Fitur"] == fitur]
-                                    chart_title = FEATURE_LABELS.get(fitur, fitur)
-                                    chart = (
-                                        alt.Chart(sub)
-                                        .mark_bar()
-                                        .encode(
-                                            x=alt.X("Cluster:N", axis=alt.Axis(title=None, labelAngle=0)),
-                                            y=alt.Y("Mean:Q", axis=alt.Axis(title=None)),
-                                            color=alt.Color("Cluster:N", title=None, scale=alt.Scale(scheme="tableau10")),
-                                            tooltip=[
-                                                "Cluster:N",
-                                                alt.Tooltip("Mean:Q", title="Rata-rata", format=".3f")
-                                            ],
-                                        )
-                                        .properties(
-                                            title={"text": chart_title, "anchor": "middle", "align": "center"},
-                                            width="container",
-                                            height=220
-                                        )
+                        # GRAFIK PERBANDINGAN STATISTIK TIAP CLUSTER
+                        st.write("---")
+                        st.write("##### Perbandingan Statistik")
+                        try:
+                            features   = get_features_for_group(group_name, FEATURES_BY_POSITION)
+                            chart_data = get_cluster_feature_chart_data(group_result, features)
+                        except BarDataMissing as e:
+                            st.info(f"Bar chart tidak dapat ditampilkan: {e}")
+                            continue
+
+                        chart_data["Fitur"] = pd.Categorical(chart_data["Fitur"], categories=features, ordered=True)
+                        clusters_order = sorted(chart_data["Cluster"].unique(), key=lambda s: int(s[1:]))  # "C0","C1",...
+                        chart_data["Cluster"] = pd.Categorical(chart_data["Cluster"], categories=clusters_order, ordered=True)
+
+                        c1, c2, c3 = st.columns(3, vertical_alignment="top")
+                        
+                        if len(features) > 0:
+                            columns= [c1, c2, c3]
+                            for i, fitur in enumerate(features):
+                                sub = chart_data[chart_data["Fitur"] == fitur]
+
+                                if sub.empty:
+                                    with columns[i % 3]:
+                                        st.empty()
+                                
+                                # BAR CHART
+                                chart_title = FEATURE_LABELS.get(fitur, fitur)
+                                chart = (
+                                    alt.Chart(sub)
+                                    .mark_bar()
+                                    .encode(
+                                        x=alt.X("Cluster:N", axis=alt.Axis(title=None, labelAngle=0)),
+                                        y=alt.Y("Mean:Q", axis=alt.Axis(title=None)),
+                                        color=alt.Color("Cluster:N", title=None, scale=alt.Scale(scheme="tableau10")),
+                                        tooltip=[
+                                            "Cluster:N",
+                                            alt.Tooltip("Mean:Q", title="Rata-rata", format=".3f")
+                                        ],
                                     )
-                                    st.altair_chart(chart)
+                                    .properties(
+                                        title={"text": chart_title, "anchor": "middle", "align": "center"},
+                                        width=480,
+                                        height=220,
+                                    )
+                                )
+                                with columns[i % 3]:
+                                    st.altair_chart(chart, use_container_width=False)
+                        else:
+                            st.info("Tidak ada statistik yang ditemukan.")
 
-                if st.button("🔄 Reset Hasil Clustering"):
-                    _clear_reco_state()
-                    _clear_cluster_state()
-                    st.rerun()            
+            # RESET HASIL CLUSTERING
+            if st.button("🔄 Reset Hasil Clustering"):
+                clear_recommend_state(st)
+                clear_cluster_state(st)
+                st.rerun()            
 
+            # DROPDOWN PILIH POSISI PEMAIN ACUAN
             selected_position = st.selectbox("Pilih Posisi Pemain Acuan", POSITION_CHOICES, index=0)
 
             if selected_position != "Pilih posisi pemain acuan":
                 st.session_state.setdefault("club_filter", "Semua")
 
-                club_options = ["Semua"] + get_clubs_by_season(season=selected_season)                    
-                
-                selected_club = st.selectbox("Pilih Klub (opsional)", options=club_options, index=0)
+                # DROPDOWN PILIH KLUB PEMAIN ACUAN
+                club_options = ["Semua"] + get_clubs_by_season(season=selected_season)                        
+                selected_club = st.selectbox("Pilih Klub Pemain Acuan", options=club_options, index=0)
                 st.session_state["club_filter"] = selected_club
 
                 if selected_season and selected_position:
                     if selected_club and selected_club != "Semua":
+                        # DENGAN FILTER KLUB
                         players = get_players_by_season_and_club(selected_season, selected_position, selected_club)
-                    else:                        
+                    else:
+                        # TANPA FILTER KLUB                        
                         players = get_players_by_season(selected_season, selected_position)
                 else:
                     players = []
-
+                
+                # PILIH PEMAIN ACUAN
                 player_option = ["Pilih Pemain Acuan"] + (players if players else [])
                 selected_player = st.selectbox("Pilih Pemain Acuan", player_option, index=0)
             else:
                 selected_player = None
                 selected_position = None
 
-        # -------------------- RESET STATE SAAT PILIHAN BERUBAH --------------------
+        # UNTUK RESET STATE
         st.session_state.setdefault("prev_season", None)
         st.session_state.setdefault("prev_position", None)
         st.session_state.setdefault("prev_anchor", None)
         st.session_state.setdefault("prev_club_filter", None)
-
-        def _clear_reco_state():
-            st.session_state["recommend_state"] = None
-            st.session_state["features"] = None
-            st.session_state["compare_recommend"] = None
-
-        def _clear_cluster_state():
-            st.session_state["cluster_result"] = None
-            st.session_state["selected_season"] = None
 
         season_changed   = (st.session_state["prev_season"]   != selected_season)
         position_changed = (st.session_state["prev_position"] != selected_position)
@@ -370,25 +356,25 @@ elif page == "Analisis":
         club_changed     = (st.session_state["prev_club_filter"] != st.session_state.get("club_filter"))
 
         if season_changed:
-            _clear_reco_state()
-            _clear_cluster_state()
+            clear_recommend_state(st)
+            clear_cluster_state(st)
             if selected_season == "Pilih Musim":
                 st.session_state["prev_season"] = selected_season
                 st.session_state["prev_position"] = None
                 st.session_state["prev_anchor"] = None
 
         if position_changed:
-            _clear_reco_state()
+            clear_recommend_state()
             if selected_position == "Pilih posisi pemain acuan":
                 st.session_state["prev_position"] = selected_position
                 st.session_state["prev_anchor"] = None
 
         if club_changed:
-            _clear_reco_state()
+            clear_recommend_state(st)
             st.session_state["prev_anchor"] = None
 
         if anchor_changed:
-            _clear_reco_state()
+            clear_recommend_state(st)
 
         st.session_state["prev_season"]   = selected_season
         st.session_state["prev_position"] = selected_position
@@ -396,7 +382,7 @@ elif page == "Analisis":
         st.session_state["prev_club_filter"] = st.session_state.get("club_filter")
         # -------------------------------------------------------------------------
         
-        # DETAIL PEMAIN ACUAN
+        # STATISTIK PEMAIN ACUAN
         if selected_season and selected_position and selected_player and selected_player != "Pilih Pemain Acuan":
             detail = get_player_detail(selected_season, selected_player)
 
@@ -448,26 +434,32 @@ elif page == "Analisis":
                 st.session_state.setdefault("features", None)
                 st.session_state.setdefault("compare_recommend", None)
 
+                # JUMLAH PEMAIN REKOMENDASI
                 recommend_count = st.slider(
                     "Jumlah pemain rekomendasi",
                     min_value=1,
-                    max_value=10,
+                    max_value=20,
                     step=1,
                     value=10
                 )
 
                 col7, col8, col9, col10 = st.columns(4)
 
+                # FILTER PEMAIN INDONESIA SAJA
                 with col7:
                     only_indo = st.checkbox("Pemain Indonesia saja", value=False)
 
+                # FILTER POSISI YANG SAMA DENGAN PEMAIN ACUAN SAJA
                 with col8:
                     filter_position = st.checkbox("Posisi yang sama saja", value=False)
 
+                # FILTER KLUB YG BERBEDA DENGAN PEMAIN ACUAN
                 with col9:
                     diff_club = st.checkbox("Klub yang berbeda saja", value=False)
                 
+                # BUTTON CARI PEMAIN REKOMENDASI
                 if recommend_count and st.button("Cari pemain rekomendasi"):
+                    # MENGAMBIL DATA PEMAIN REKOMENDASI
                     recommend_players = get_recommend_similar_players(
                         season=selected_season,
                         position_code=selected_position,
@@ -478,14 +470,16 @@ elif page == "Analisis":
                         diff_club=diff_club
                     )
 
+                    # YANG DITAMPILKAN JIKA TIDAK ADA PEMAIN REKOMENDASI YANG DITEMUKAN
                     if recommend_players.empty:
                         st.info("Tidak ada pemain rekomendasi yang cocok untuk konfigurasi ini.")
                         st.session_state["recommend_state"] = None
                         st.session_state["features"] = None
                         st.session_state["compare_recommend"] = None
                     else:
+                        # MENGAMBIL DATA PEMAIN REKOMENDASI
                         st.session_state["recommend_state"] = recommend_players
-                        st.session_state["features"] = get_player_features_df(selected_season)
+                        st.session_state["features"] = get_player_features_data(selected_season)
                         st.session_state["compare_recommend"] = None                                                                                
 
                 recommend_state = st.session_state.get("recommend_state")
@@ -520,11 +514,13 @@ elif page == "Analisis":
                         if col6.button("Bandingkan", key=f"compare_{i}_{ds.get('player','')}"):
                             st.session_state["compare_recommend"] = ds['player']
                     
+                    # PERBANDINGAN STATISTIK PEMAIN ACUAN DENGAN PEMAIN REKOMENDASI
                     target_player = st.session_state["compare_recommend"]
                     if target_player and features is not None:
                         with st.expander(f"Perbandingan {selected_player} dengan {target_player}", expanded=True):                                
                             try:
-                                chart_data = prepare_comparison_chart_data(
+                                # MENGAMBIL DATA PERBANDINGAN STATISTIK
+                                chart_data = get_comparison_chart_data(
                                     features=features,
                                     anchor_player=selected_player,
                                     target_player=target_player,
@@ -536,7 +532,7 @@ elif page == "Analisis":
                                 if not FEATURES_TO_COMPARE:
                                     st.warning("Daftar fitur kosong. Isi `FEATURES_TO_COMPARE` dulu.")
                                 else:
-                                    # MENAMPILKAN BAR CHART
+                                    # MENAMPILKAN BAR CHART PERBANDINGAN STATISTIK
                                     N_COLS = 2
                                     fitur_list = list(chart_data["Fitur"].unique())
                                     for start in range(0, len(fitur_list), N_COLS):
@@ -567,7 +563,9 @@ elif page == "Analisis":
                                             with c:
                                                 st.altair_chart(chart)
 
+# ===============================
 # HALAMAN ABOUT
+# ===============================
 elif page == "About":
     st.header("Tentang Saya")
 
@@ -602,7 +600,7 @@ elif page == "About":
     Website ini dibangun dengan:
     - **Python** sebagai bahasa pemrograman utama
     - **Streamlit** digunakan untuk membangun UI website
-    - **Django** digunakan sebagai backend service
+    - **Django** digunakan sebagai ORM untuk mengelola database
     - **PostgreSQL** digunakan sebagai database untuk menyimpan data statistik pemain    
 
     """)

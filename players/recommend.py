@@ -108,7 +108,7 @@ def get_recommend_similar_players(
     return out.reset_index(drop=True)
 
 # MEMBACA FITUR UNTUK YANG DIPAKAI UNTUK PEMAIN ACUAN DAN PEMAIN REKOMENDASI
-def get_feature_rows(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> tuple[pd.Series, pd.Series]:
+def get_feature_data(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> tuple[pd.Series, pd.Series]:
     position_features = ["player", *features]
     anchor = feat_df.loc[feat_df["player"] == anchor_player, position_features]
     recommend = feat_df.loc[feat_df["player"] == target_player, position_features]
@@ -120,7 +120,7 @@ def get_feature_rows(feat_df: pd.DataFrame, anchor_player: str, target_player: s
 
 # ==================================================================================================================================
 # UNTUK MEMBUAT CHART PERBANDINGAN
-def build_long_compare_df(anchor_row: pd.Series, recommend_row: pd.Series, features: list[str]) -> pd.DataFrame:
+def get_comparison_data(anchor_row: pd.Series, recommend_row: pd.Series, features: list[str]) -> pd.DataFrame:
     df = pd.DataFrame({
         "Fitur": features,
         anchor_row["player"]: [anchor_row[f] for f in features],
@@ -129,8 +129,8 @@ def build_long_compare_df(anchor_row: pd.Series, recommend_row: pd.Series, featu
     chart_data = df.melt(id_vars="Fitur", var_name="Pemain", value_name="Nilai")
     return chart_data
 
-def prepare_comparison_chart_data(features: pd.DataFrame, anchor_player: str, target_player: str, features_to_compare: list[str]) -> pd.DataFrame:
-    anchor_row, recommend_row = get_feature_rows(features, anchor_player, target_player, features_to_compare)
-    return build_long_compare_df(anchor_row, recommend_row, features_to_compare)
+def get_comparison_chart_data(features: pd.DataFrame, anchor_player: str, target_player: str, features_to_compare: list[str]) -> pd.DataFrame:
+    anchor_row, recommend_row = get_feature_data(features, anchor_player, target_player, features_to_compare)
+    return get_comparison_data(anchor_row, recommend_row, features_to_compare)
 
 # ==================================================================================================================================
