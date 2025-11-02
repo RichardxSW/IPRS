@@ -5,7 +5,9 @@ from sklearn.preprocessing import StandardScaler, normalize, RobustScaler
 from sklearn.decomposition import PCA
 from sklearn.cluster import MeanShift
 from sklearn.metrics import silhouette_score, davies_bouldin_score
-from .models import Player
+from .models import Player, League
+from django.db.models import Case, When, Value, F, CharField
+from django.db.models.functions import Concat
 
 # =============================
 # FITUR YANG TERPAKAI UNTUK CLUSTERING
@@ -35,7 +37,7 @@ FEATURES_BY_POSITION = {
 
 # FITUR YANG TIDAK TERPAKAI UNTUK CLUSTERING
 META_COLUMNS = [
-    "id", "player", "team", "position", "nationality",
+    "id", "player_name", "team", "position", "nationality",
     "age", "appearance", "total_minute",
     "total_goal", "assist", "error"
 ]
@@ -67,13 +69,23 @@ FEATURE_LABELS = {
 # =============================
 # MENGAMBIL DATA FITUR FITUR PEMAIN
 # =============================
-def get_player_features_data(season: str) -> pd.DataFrame:
+def get_player_features_data(selected_league, season: str) -> pd.DataFrame:
     all_feature = sorted({f for feats in FEATURES_BY_POSITION.values() for f in feats})
     qs = (
         Player.objects
-        .filter(season__season=season)
+        .filter(league__league_name=selected_league.strip(), league__season=season.strip())
+        .annotate(
+            player_name=Case(
+                When(
+                    naturalisasi=True,
+                    then=Concat(F('player'), Value(' ( Naturalisasi )'))
+                ),\
+                default=F('player'),
+                output_field=CharField()
+            )
+        )
         .values(*META_COLUMNS, *all_feature)
-        .order_by("player")
+        .order_by("player_name")
     )
     return pd.DataFrame(list(qs))
 
@@ -144,11 +156,11 @@ def run_meanshift(df: pd.DataFrame, features):
         "Bandwidth": r["bw"],
         "Jumlah Cluster": r["n_clusters"],
         "Silhouette": f"{r['silhouette']:.4f}" if r["silhouette"] is not None else "-",
-        "DBI": f"{r["dbi"]:.4f}" if r["dbi"] is not None else '-',
+        "DBI": f"{r['dbi']:.4f}" if r["dbi"] is not None else "-",
     } for r in results])
 
-    valid_silhouette = [r for r in results if r["silhouette"] is not None and r["n_clusters"] != '-']
-    valid_dbi = [r for r in results if r["dbi"] and r['dbi'] is not None != '-']
+    valid_silhouette = [r for r in results if r["silhouette"] is not None and r['silhouette'] != '-']
+    valid_dbi = [r for r in results if r["dbi"] and r['dbi'] is not None and r['dbi'] != '-']
     best_silhouette = max(valid_silhouette, key=lambda r: r["silhouette"]) if valid_silhouette else None
     best_dbi = min(valid_dbi, key=lambda r: r["dbi"]) if valid_dbi else None
     same_bw = best_silhouette and best_dbi and best_silhouette["bw"] == best_dbi["bw"]
@@ -165,8 +177,8 @@ def run_meanshift(df: pd.DataFrame, features):
     }
 
 # MENJALANKAN MEAN SHIFT PER KATEGORI POSISI PEMAIN
-def run_meanshift_by_position(season: str):
-    players = get_player_features_data(season)
+def run_meanshift_by_position(selected_league, season: str):
+    players = get_player_features_data(selected_league, season)
     if players.empty:
         return {"Forward": None, "Midfielder": None, "Defender": None}
 
@@ -191,21 +203,21 @@ def get_cluster_members_data(result: dict, best: dict):
 
     labels = np.asarray(best["labels"])
     players = result.get("players")
-    if not isinstance(players, pd.DataFrame) or "player" not in players.columns:
+    if not isinstance(players, pd.DataFrame) or "player_name" not in players.columns:
         return None
 
     players = players.reset_index(drop=True)
     if len(players) != len(labels):
         return None
 
-    player_name = players[["player"]].copy()
+    player_name = players[["player_name"]].copy()
     try:
         player_name["ClusterId"] = labels.astype(int)
     except Exception:
         player_name["ClusterId"] = labels
 
     grouped = (
-        player_name.groupby("ClusterId")["player"]
+        player_name.groupby("ClusterId")["player_name"]
         .apply(list)
         .to_dict()
     )

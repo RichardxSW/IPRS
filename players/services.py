@@ -4,10 +4,12 @@ from typing import List
 import numpy as np
 import pandas as pd
 from django.db import transaction
-from .models import Player, Season
+from .models import League, Player
 from django.db.models import Count
 from django.core.exceptions import ValidationError
 import io
+from django.db.models import Case, When, Value, F, CharField
+from django.db.models.functions import Concat
 
 # CHOICES BUAT POSISI PEMAIN ACUAN
 POSITION_CHOICES = [
@@ -25,33 +27,41 @@ POSITION_CHOICES = [
     "RB"
 ]
 
+NUM_COLS = [
+    "Age","Appearance","Total Minute","Total Goal","Goal/game","Shot/game","SoT/game",
+    "Assist","Assist/game","Success Dribble/game","Key Pass/game","Successful Pass/game",
+    "Long Ball/game","Successful Crossing/game","Ball Recovered/game","Dribbled Past/game",
+    "Clearance/game","Error leading to shot","Error leading to shot/game",
+    "Total duel won/game","Aerial duel won/game"
+]
+
 TEMPLATE_DATA = {
-        "Player": ["Marc Klok", np.nan],
-        "Team": ["Persib Bandung", np.nan],
-        "Nationality": ["Indonesia",np.nan],
-        "Position": ["DM", np.nan],
-        "Age": [25, np.nan],
-        "Appearance": [34, np.nan],
-        "Total Minute": [3060, np.nan],
-        "Total Goal": [10, np.nan],
-        "Goal/game": [1,np.nan],
-        "Shot/game": [1, np.nan],
-        "SoT/game": [1, np.nan],
-        "Assist": [5, np.nan],
-        "Assist/game": [1, np.nan],
-        "Success Dribble/game": [8, np.nan],
-        "Key Pass/game": [5, np.nan],
-        "Successful Pass/game": [20, np.nan],
-        "Long Ball/game": [10, np.nan],
-        "Successful Crossing/game": [10, np.nan],
-        "Ball Recovered/game": [10, np.nan],
-        "Dribbled Past/game": [5, np.nan],
-        "Clearance/game": [5,np.nan],
-        "Error leading to shot": [5, np.nan],
-        "Error leading to shot/game": [5, np.nan],
-        "Total duel won/game": [5, np.nan],
-        "Aerial duel won/game": [5, np.nan],
-    }
+    "Player": ["Marc Klok", "Beckham Putra Nugraha"],
+    "Team": ["Persib Bandung", "Persib Bandung"],
+    "Nationality": ["Indonesia","Indonesia"],
+    "Position": ["DM", "RW"],
+    "Age": [32, 24],
+    "Appearance": [34, 29],
+    "Total Minute": [3060, 1975],
+    "Total Goal": [2, 6],
+    "Goal/game": [1,2],
+    "Shot/game": [1, 1.5],
+    "SoT/game": [1, 1],
+    "Assist": [3, 6],
+    "Assist/game": [1, 1.5],
+    "Success Dribble/game": [4, 8],
+    "Key Pass/game": [1, 2],
+    "Successful Pass/game": [20, 15],
+    "Long Ball/game": [10, 2],
+    "Successful Crossing/game": [2, 5],
+    "Ball Recovered/game": [10, 5],
+    "Dribbled Past/game": [5, 2],
+    "Clearance/game": [5, 1],
+    "Error leading to shot": [5, 2],
+    "Error leading to shot/game": [5, 0.5],
+    "Total duel won/game": [5, 5],
+    "Aerial duel won/game": [5, 1],
+}
 
 def clear_recommend_state(st):
     st.session_state["recommend_state"] = None
@@ -82,31 +92,34 @@ def get_required(row, columns, key, string=False):
 def post_dataset(league_name: str, season: str, df: pd.DataFrame) -> int:
     column = {c.lower(): c for c in df.columns}
 
-    # validasi format musim
+    # VALIDASI FORMAT MUSIM
     pattern = r"^\d{4}/\d{4}$"
     if not re.match(pattern, season):
         raise ValidationError("Format musim tidak valid. Gunakan format seperti 2024/2025.")
 
+    # VALIDASI MUSIM
     start, end = map(int, season.split("/"))
     if end - start != 1:
         raise ValidationError("Tahun akhir harus satu tahun setelah tahun awal, misal 2024/2025.")
 
-    # --- CEK APAKAH SUDAH ADA DATASET DENGAN MUSIM TERSEBUT ---
-    if Season.objects.filter(season=season.strip()).exists():
+    # CEK APAKAH SUDAH ADA DATA DENGAN MUSIM TERSEBUT
+    if League.objects.filter(league_name=league_name.strip(), season=season.strip()).exists():
         raise ValidationError(f"Data untuk {league_name} musim {season} sudah ada.")
 
-    ds, created = Season.objects.get_or_create(
+    ds, created = League.objects.get_or_create(
         league_name=league_name.strip(),
         season=season.strip()
     )
     if not created:
         ds.players.all().delete()
 
+    # VALIDASI VARIABEL
     bulk = []
     for _, row in df.iterrows():
         player = get_required(row, column, "player", string=True)
         team = get_required(row, column, "team", string=True)
         nat = get_required(row, column, "nationality", string=True)
+        naturalisasi = get_required(row, column, "naturalisasi")
         pos  = get_required(row, column, "position", string=True)
         age  = get_required(row, column, "age")
         app  = get_required(row, column, "appearance")
@@ -132,10 +145,11 @@ def post_dataset(league_name: str, season: str, df: pd.DataFrame) -> int:
 
         bulk.append(
             Player(
-                season=ds,
+                league=ds,
                 player=player,
                 team=team, 
-                nationality=nat, 
+                nationality=nat,
+                naturalisasi=True if naturalisasi in ["True", "TRUE", "true", True] else False,
                 position=pos,
                 age=age,
                 appearance=app,
@@ -166,17 +180,24 @@ def post_dataset(league_name: str, season: str, df: pd.DataFrame) -> int:
 
     return ds.id
 
-# BACA DAFTAR MUSIM
-def get_seasons() -> List[str]:
+# AMBIL DATA LIGA
+def get_leagues() -> List[str]:
     return list(
-        Season.objects.values_list("season", flat=True).distinct().order_by("season")
+        League.objects.values_list("league_name", flat=True).distinct().order_by("league_name")
+    )
+
+# AMBIL DAFTAR MUSIM
+def get_seasons(selected_league) -> List[str]:
+    return list(
+        League.objects.filter(league_name=selected_league.strip()).values_list("season", flat=True).order_by("season")
     )
 
 # AMBIL DATA KLUB
-def get_clubs_by_season(season: str) -> List[str]:
+def get_clubs_by_season(selected_league, season: str) -> List[str]:
     club = list(
         Player.objects.filter(
-            season__season=season
+            league__season=season,
+            league__league_name=selected_league,
         )
         .order_by("team")
         .values_list("team", flat=True)
@@ -186,36 +207,54 @@ def get_clubs_by_season(season: str) -> List[str]:
     return club
 
 # AMBIL DATA PEMAIN
-def get_players_by_season(season: str, position: str) -> List[str]:
+def get_players_by_season(selected_league, season: str, position: str) -> List[str]:
     players = list(
         Player.objects.filter(
-            season__season=season, 
+            league__season=season,
+            league__league_name=selected_league,
             position__icontains=position,
-        ).order_by("player").values_list("player", flat=True)
+        ).annotate(
+            player_name=Case(
+                When(
+                    naturalisasi=True,
+                    then=Concat(F('player'), Value(' ( Naturalisasi )'))
+                ),\
+                default=F('player'),
+                output_field=CharField()
+            )
+        ).order_by("player_name").values_list("player_name", flat=True)
     )
     print(len(players))
     return players
 
 # AMBIL DATA PEMAIN DENGAN FILTER KLUB
-def get_players_by_season_and_club(season: str, position: str, club: str) -> List[str]:    
+def get_players_by_season_and_club(selected_league, season: str, position: str, club: str) -> List[str]:    
     qs = Player.objects.filter(
-        season__season=season,
+        league__league_name=selected_league,
+        league__season=season,
         position__icontains=position,
     )
     if club and club.lower() != "semua":
         qs = qs.filter(team__iexact=club)
 
-    players = list(qs.order_by("player").values_list("player", flat=True))
+    players = list(qs.annotate(
+        player_name=Case(
+            When(
+                naturalisasi=True,
+                then=Concat(F('player'), Value(' ( Naturalisasi )'))
+            ),\
+            default=F('player'),
+            output_field=CharField()
+        )
+    ).order_by("player_name").values_list("player_name", flat=True))
     print(len(players))
     return players
 
 # DOWNLOAD TEMPLATE DATASET
-def build_template_file() -> bytes:
-    template = pd.DataFrame(TEMPLATE_DATA)
-
+def build_template_file(df) -> bytes:    
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
-        template.to_excel(writer, index=False, sheet_name="Template Dataset")
+        df.to_excel(writer, index=False, sheet_name="Template Dataset")
 
     buf.seek(0)
     return buf.getvalue()
@@ -223,7 +262,7 @@ def build_template_file() -> bytes:
 #BACA DATA PEMAIN ACUAN 
 def get_player_detail(season: str, player_name: str) -> dict | None:
     fields = [
-        "player", "team", "nationality", "position", "age",
+        "player_name", "team", "nationality", "position", "age",
         "appearance", "total_minute", "total_goal","assist",
         "goal_per_game", "shot_per_game", "sot_per_game",
         "assist_per_game", "successful_dribble_per_game", "key_pass_per_game",
@@ -231,9 +270,22 @@ def get_player_detail(season: str, player_name: str) -> dict | None:
         "ball_recovered_per_game", "dribbled_past_per_game", "clearance_per_game",
         "error", "error_per_game", "total_duel_per_game", "aerial_duel_per_game",
     ]
+
+    player_name = player_name.replace(" ( Naturalisasi )", "").strip()
+    
     return (
         Player.objects
-        .filter(season__season=season, player=player_name)
+        .filter(league__season=season, player=player_name)
+        .annotate(
+            player_name=Case(
+                When(
+                    naturalisasi=True,
+                    then=Concat(F('player'), Value(' ( Naturalisasi )'))
+                ),\
+                default=F('player'),
+                output_field=CharField()
+            )
+        )
         .values(*fields)
         .first()
     )
@@ -241,7 +293,7 @@ def get_player_detail(season: str, player_name: str) -> dict | None:
 #BACA DETAIL MUSIM YANG TERSIMPAN
 def get_list_of_season():
     return list(
-        Season.objects
+        League.objects
         .annotate(player_count=Count('players'))
         .values('id', 'league_name', 'season', 'player_count', 'uploaded_at')
         .order_by('-uploaded_at')
@@ -249,7 +301,7 @@ def get_list_of_season():
 
 #HAPUS MUSIM
 def delete_dataset(dataset_id: int) -> bool:
-    deleted, _ = Season.objects.filter(id=dataset_id).delete()
+    deleted, _ = League.objects.filter(id=dataset_id).delete()
     return deleted > 0
 
 

@@ -40,6 +40,7 @@ def _matches_position(position_str: str, anchor_position: set[str]) -> bool:
 
 # MENCARI PEMAIN REKOMENDASI DAN MENGHITUNG COSINE SIMILARITY
 def get_recommend_similar_players(
+    league,
     season: str,
     position_code: str,
     anchor_player: str,
@@ -52,7 +53,7 @@ def get_recommend_similar_players(
     if not group:
         raise ValueError("Kode posisi tidak valid.")
 
-    all_results = run_meanshift_by_position(season)
+    all_results = run_meanshift_by_position(league, season)
     results = all_results.get(group)
     if not results or not results.get("best_silhouette"):
         return pd.DataFrame()
@@ -62,7 +63,7 @@ def get_recommend_similar_players(
     players = results["players"].copy()
 
     # cari pemain acuan
-    anchor = players["player"].str.lower() == str(anchor_player).lower()
+    anchor = players["player_name"].str.lower() == str(anchor_player).lower()
     if not anchor.any():
         return pd.DataFrame()
 
@@ -109,9 +110,9 @@ def get_recommend_similar_players(
 
 # MEMBACA FITUR UNTUK YANG DIPAKAI UNTUK PEMAIN ACUAN DAN PEMAIN REKOMENDASI
 def get_feature_data(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> tuple[pd.Series, pd.Series]:
-    position_features = ["player", *features]
-    anchor = feat_df.loc[feat_df["player"] == anchor_player, position_features]
-    recommend = feat_df.loc[feat_df["player"] == target_player, position_features]
+    position_features = ["player_name", *features]
+    anchor = feat_df.loc[feat_df["player_name"] == anchor_player, position_features]
+    recommend = feat_df.loc[feat_df["player_name"] == target_player, position_features]
     if anchor.empty:
         raise ValueError(f"Data fitur pemain acuan '{anchor_player}' tidak ditemukan.")
     if recommend.empty:
@@ -123,8 +124,8 @@ def get_feature_data(feat_df: pd.DataFrame, anchor_player: str, target_player: s
 def get_comparison_data(anchor_row: pd.Series, recommend_row: pd.Series, features: list[str]) -> pd.DataFrame:
     df = pd.DataFrame({
         "Fitur": features,
-        anchor_row["player"]: [anchor_row[f] for f in features],
-        recommend_row["player"]: [recommend_row[f] for f in features],
+        anchor_row["player_name"]: [anchor_row[f] for f in features],
+        recommend_row["player_name"]: [recommend_row[f] for f in features],
     })
     chart_data = df.melt(id_vars="Fitur", var_name="Pemain", value_name="Nilai")
     return chart_data
