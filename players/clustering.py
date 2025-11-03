@@ -10,7 +10,7 @@ from django.db.models import Case, When, Value, F, CharField
 from django.db.models.functions import Concat
 
 # =============================
-# FITUR YANG TERPAKAI UNTUK CLUSTERING
+# KATEGORI POSISI PEMAIN
 # =============================
 POSITION_GROUPS = {
     "Pemain Penyerang": ["ST", "LW", "RW"],
@@ -18,6 +18,7 @@ POSITION_GROUPS = {
     "Pemain Bertahan": ["CB", "LB", "RB"],
 }
 
+# FITUR YANG DIGUNAKAN UNTUK CLUSTERING PER KATEGORI POSISI PEMAIN
 FEATURES_BY_POSITION = {
     "Pemain Penyerang": [
         "goal_per_game", "shot_per_game", "sot_per_game", "assist_per_game", "successful_dribble_per_game", 
@@ -66,9 +67,8 @@ FEATURE_LABELS = {
     "error": "Error Leading to Shot"
 }
 
-# =============================
+
 # MENGAMBIL DATA FITUR FITUR PEMAIN
-# =============================
 def get_player_features_data(selected_league, season: str) -> pd.DataFrame:
     all_feature = sorted({f for feats in FEATURES_BY_POSITION.values() for f in feats})
     qs = (
@@ -90,7 +90,8 @@ def get_player_features_data(selected_league, season: str) -> pd.DataFrame:
     return pd.DataFrame(list(qs))
 
 # PREPROCESSING DATA
-def _prepare_matrix(df: pd.DataFrame, feat_cols):
+def preprocessing_data(df: pd.DataFrame, feat_cols):
+    # VALIDASI DATA 
     X = (
         df[feat_cols]
         .astype(float)
@@ -99,23 +100,24 @@ def _prepare_matrix(df: pd.DataFrame, feat_cols):
         .values
     )
 
-    X_scaled = StandardScaler().fit_transform(X)    
+    # ZSCORE
+    X_scaled = StandardScaler().fit_transform(X)
+
+    # PCA
     X_pca = PCA(n_components=2).fit_transform(X_scaled)
     return X_scaled, X_pca
 
-# =============================
-# MEAN SHIFT CLUSTERING
-# =============================
+# METODE MEAN SHIFT
 def run_meanshift(df: pd.DataFrame, features):
     #PREPROSES
-    X_scaled, X_pca = _prepare_matrix(df, features)
+    X_scaled, X_pca = preprocessing_data(df, features)
 
     # BANDWIDTH
     bandwidths = np.arange(0.5, 5.5, 0.5)
 
     results = []
 
-    #LOOP MEANSHIFT 
+    # MENGUJI CLUSTERING DENGAN BANDWIDTH 0,5 - 5
     for bw in bandwidths:
         labels, n_clusters, = None, 0        
         for bin_seed in [True]:
@@ -124,7 +126,6 @@ def run_meanshift(df: pd.DataFrame, features):
                 with warnings.catch_warnings():
                     warnings.simplefilter("ignore", UserWarning)
                     labels = ms.fit_predict(X_scaled)
-                # JUMLAH CLUSTER
                 n_clusters = len(np.unique(labels))
                 break
             except ValueError:
@@ -154,7 +155,7 @@ def run_meanshift(df: pd.DataFrame, features):
 
     cluster_result = pd.DataFrame([{
         "Bandwidth": r["bw"],
-        "Jumlah Cluster": r["n_clusters"],
+        "Cluster": r["n_clusters"],
         "Silhouette": f"{r['silhouette']:.4f}" if r["silhouette"] is not None else "-",
         "DBI": f"{r['dbi']:.4f}" if r["dbi"] is not None else "-",
     } for r in results])

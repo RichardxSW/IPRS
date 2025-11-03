@@ -16,7 +16,7 @@ FEATURES_TO_COMPARE = [
 ]
 
 # MENGKATEGORIKAN POSISI KE PENYERANG, GELANDANG ATAU BERTAHAN
-def _group_for_position(position_code: str) -> str | None:
+def group_for_position(position_code: str) -> str | None:
     position = str(position_code).upper().strip()
     for group, positions in POSITION_GROUPS.items():
         if position in positions:
@@ -24,7 +24,7 @@ def _group_for_position(position_code: str) -> str | None:
     return None
 
 # Ubah posisi jadi (huruf besar, spasi, /, -, koma).
-def _format_position(position_str) -> set[str]:    
+def format_position(position_str) -> set[str]:    
     if position_str is None:
         return set()
     if isinstance(position_str, float) and math.isnan(position_str):
@@ -34,8 +34,8 @@ def _format_position(position_str) -> set[str]:
     return set(position)
 
 # FILTER POSISI
-def _matches_position(position_str: str, anchor_position: set[str]) -> bool:
-    positions = _format_position(position_str)
+def matches_position(position_str: str, anchor_position: set[str]) -> bool:
+    positions = format_position(position_str)
     return bool(positions & anchor_position)
 
 # MENCARI PEMAIN REKOMENDASI DAN MENGHITUNG COSINE SIMILARITY
@@ -49,7 +49,7 @@ def get_recommend_similar_players(
     filter_position: bool = False,
     diff_club: bool = False
 ):
-    group = _group_for_position(position_code)
+    group = group_for_position(position_code)
     if not group:
         raise ValueError("Kode posisi tidak valid.")
 
@@ -70,7 +70,7 @@ def get_recommend_similar_players(
     anchor_idx = int(players[anchor].index[0])
     anchor_cluster = int(labels[anchor_idx])
     anchor_position_str = players.loc[anchor_idx, "position"]
-    anchor_position = _format_position(anchor_position_str)
+    anchor_position = format_position(anchor_position_str)
 
     # ambil hanya pemain dalam cluster yang sama
     same_idx = np.where(labels == anchor_cluster)[0]
@@ -85,16 +85,19 @@ def get_recommend_similar_players(
 
     # FILTER POSISI YANG SAMA DENGAN PEMAIN ACUAN
     if "position" in players.columns and filter_position:
-        same_idx = [j for j in same_idx if _matches_position(players.loc[j, "position"], anchor_position)]
+        same_idx = [j for j in same_idx if matches_position(players.loc[j, "position"], anchor_position)]
 
+    # DATA PEMAIN ACUAN
+    anchor_vec = X_scaled[anchor_idx:anchor_idx+1]
+
+    # DATA PEMAIN DALAM CLUSTER YANG SAMA
+    cluster_vecs = X_scaled[same_idx]
 
     # hitung cosine similarity antara pemain acuan dan pemain dalam cluster yg sama
-    anchor_vec = X_scaled[anchor_idx:anchor_idx+1]
-    cluster_vecs = X_scaled[same_idx]
-    sims = cosine_similarity(anchor_vec, cluster_vecs).ravel()
+    cos_sim = cosine_similarity(anchor_vec, cluster_vecs).ravel()
 
     out = players.iloc[same_idx].copy()
-    out["similarity"] = sims
+    out["similarity"] = cos_sim
 
     # MEMBUANG PEMAIN ACUAN
     out = out[out.index != anchor_idx]

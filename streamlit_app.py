@@ -24,19 +24,19 @@ from players.recommend import FEATURES_TO_COMPARE, get_recommend_similar_players
 st.set_page_config(page_title="IPRS", layout="wide")
 
 # ====== STYLE ======
-# st.markdown(
-#     """
-#         <style>
-#         .block-container {
-#             padding-top: 3rem;
-#             padding-bottom: 3rem;
-#             padding-left: 3rem;
-#             padding-right: 3rem;
-#         }
-#         </style>
-#     """, 
-#     unsafe_allow_html=True
-# )
+st.markdown(
+    """
+        <style>
+        .block-container {
+            padding-top: 3rem;
+            padding-bottom: 3rem;
+            padding-left: 3rem;
+            padding-right: 3rem;
+        }
+        </style>
+    """, 
+    unsafe_allow_html=True
+)
 # st.markdown("""
 #     <style>
 #         .stApp {
@@ -52,7 +52,7 @@ st.set_page_config(page_title="IPRS", layout="wide")
 # =========================
 # SIDEBAR
 # =========================
-st.sidebar.title("IFPRS")
+st.sidebar.title("FPRS")
 if "page" not in st.session_state:
     st.session_state.page = "Beranda"
 
@@ -60,7 +60,7 @@ sidebar_map = {
     "Beranda": "Beranda",
     "Unggah Dataset": "Unggah Dataset",
     "Analisis": "Analisis",
-    "About": "About",
+    "Tentang": "Tentang",
 }
 
 for label, target in sidebar_map.items():
@@ -73,11 +73,11 @@ page = st.session_state.page
 # HALAMAN BERANDA
 # =========================
 if page == "Beranda":
-    st.title("Sistem Rekomendasi Pemain Sepak Bola Indonesia")
+    st.title("Sistem Rekomendasi Pemain Sepak Bola")
     st.markdown(
         """
         ---
-        #### Selamat datang di Indonesian Football Player Recommendation System ⚽  
+        ### Selamat datang di Sistem Rekomendasi Pemain Sepak Bola ⚽  
         Gunakan sistem ini untuk menemukan pemain rekomendasi yang mirip dengan pemain acuan yang anda pilih berdasarkan statistik performa
         """
     )
@@ -87,21 +87,20 @@ if page == "Beranda":
         ### Fitur yang terdapat di website ini
         """
     )
-    # st.write("- **Unggah Dataset** → Download template dataset dan menyimpan data liga dan pemain.")
-    # st.write("- **Analisis** → Jalankan clustering, mencari pemain rekomendasi, dan membandingkan pemain acuan dengan pemain rekmendasi.")
-    # st.write("- **About** → Lihat lebih lanjut tentang pembuat dan website.")
     
     col1, col2, col3 = st.columns(3)
     with col1:
         st.subheader("📂 Unggah Dataset")
-        st.write("Upload data untuk memulai analisis.")
+        st.write("Unggah data liga dan statistik pemain untuk memulai analisis.")
     with col2:
         st.subheader("📊 Analisis")
         st.write("Lihat hasil clustering dan temukan pemain rekomendasi.")
     with col3:
-        st.subheader("👨‍💻 About")
+        st.subheader("👨‍💻 Tentang")
         st.write("Lihat lebih lanjut tentang pembuat dan website.")
+
     st.markdown("---")
+
     if st.button("Mulai Analisis Sekarang 🚀"):
         st.session_state.page = "Analisis"
         st.rerun()
@@ -119,16 +118,19 @@ elif page == "Unggah Dataset":
         "Download Template",
         data=build_template_file(df),
         file_name=f"template_dataset_{dt.datetime.now():%Y%m%d}.xlsx",
+        # CONTENT TYPE XLSX
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     )
 
     # UPLOAD FILE DATASET
     st.markdown("---")
     st.header("Unggah Dataset")
+    st.session_state.setdefault("uploader_key", 0)
+
     with st.form("upload_form", width=760):
         league_name = st.text_input("Nama Liga", value="Liga 1 Indonesia")
         season = st.text_input("Musim", placeholder=f"misal 2024/2025", value="2024/2025")
-        file = st.file_uploader("Unggah file dataset", type="xlsx")
+        file = st.file_uploader("Unggah file dataset", type="xlsx", key=f"upload_{st.session_state['uploader_key']}")
         submitted = st.form_submit_button("Simpan")
 
     if submitted:
@@ -144,6 +146,7 @@ elif page == "Unggah Dataset":
                 dataset_file = pd.read_excel(file)
                 post_dataset(league_name, season, dataset_file)
                 st.success(f"Sukses menyimpan dataset: {league_name} – {season}.")
+                st.session_state["uploader_key"] += 1
                 st.rerun()
         except KeyError as ke:
             st.error(str(ke))
@@ -155,8 +158,9 @@ elif page == "Unggah Dataset":
             st.error(f"Gagal memproses file: {e}")
 
     st.markdown("---")
+    
+    # MENAMPILKAN DATA LIGA YANG SUDAH DIUNGGAH
     st.header("Data Yang Sudah Diunggah")
-
     seasons = get_list_of_season()
 
     # YANG DITAMPILKAN JIKA BELOM ADA DATA YANG DISIMPAN
@@ -199,10 +203,10 @@ elif page == "Analisis":
     st.session_state.setdefault("cluster_result", None)
     st.session_state.setdefault("selected_season", None)
 
+    # UNTUK DROPDOWN PILIH LIGA
     league_choices = ["Pilih Liga"] + get_leagues()
     selected_league = st.selectbox("Pilih Liga", league_choices, index=0)
 
-    # === DETEKSI JIKA GANTI LIGA ===
     st.session_state.setdefault("prev_league", None)
     league_changed = (st.session_state["prev_league"] != selected_league)
 
@@ -233,7 +237,8 @@ elif page == "Analisis":
                 selected_position = None
                 selected_player = None
 
-                if selected_season != "Pilih Musim":            
+                if selected_season != "Pilih Musim":
+                    # BUTTON UNTUK MEMULAI CLUSTERING
                     if st.button("Clustering"):
                         clear_recommend_state(st)
                         with st.spinner("Sedang menjalankan clustering..."):
@@ -242,7 +247,7 @@ elif page == "Analisis":
                         st.session_state.selected_season = selected_season                
                         st.success("Clustering berhasil.")
 
-                # === HASIL CLUSTERING ===
+                # HASIL CLUSTERING
                 results = st.session_state.get("cluster_result")
                 if results and st.session_state.get("selected_season") == selected_season:
                     with st.expander("Hasil Clustering", expanded=False):
@@ -270,7 +275,7 @@ elif page == "Analisis":
                                     )
                                 st.markdown("---")
 
-                                c1, c2, c3 = st.columns([1, 1, 1], vertical_alignment="top")
+                                c1, c2, c3 = st.columns(3, vertical_alignment="top")
 
                                 # TABEL HASIL EVALUASI CLUSTERING 
                                 with c1:
@@ -280,7 +285,8 @@ elif page == "Analisis":
                                             cluster_result.reset_index(drop=True),
                                             hide_index=True,
                                             disabled=True,
-                                            height=380,                                    
+                                            height=380,
+                                            # width=290
                                         )
                                     else:
                                         st.info("Belum ada evaluasi bandwidth.")
@@ -310,7 +316,7 @@ elif page == "Analisis":
                                                 df_members,
                                                 hide_index=True,
                                                 disabled=True,
-                                                height=420,                                        
+                                                height=420,
                                             )
                                         else:
                                             st.info("Daftar pemain per cluster tidak ditemukan.")
@@ -328,7 +334,7 @@ elif page == "Analisis":
                                     continue
 
                                 chart_data["Fitur"] = pd.Categorical(chart_data["Fitur"], categories=features, ordered=True)
-                                clusters_order = sorted(chart_data["Cluster"].unique(), key=lambda s: int(s[1:]))  # "C0","C1",...
+                                clusters_order = sorted(chart_data["Cluster"].unique(), key=lambda s: int(s[1:]))
                                 chart_data["Cluster"] = pd.Categorical(chart_data["Cluster"], categories=clusters_order, ordered=True)
 
                                 c1, c2, c3 = st.columns(3, vertical_alignment="top")
@@ -358,17 +364,17 @@ elif page == "Analisis":
                                             )
                                             .properties(
                                                 title={"text": chart_title, "anchor": "middle", "align": "center"},
-                                                width=480,
+                                                # width=420,
                                                 height=220,
                                             )
                                         )
                                         with columns[i % 3]:
-                                            st.altair_chart(chart, use_container_width=False)
+                                            st.altair_chart(chart)
                                 else:
                                     st.info("Tidak ada statistik yang ditemukan.")
 
                     # RESET HASIL CLUSTERING
-                    if st.button("🔄 Reset Hasil Clustering"):
+                    if st.button("Reset Hasil Clustering"):
                         clear_recommend_state(st)
                         clear_cluster_state(st)
                         st.rerun()            
@@ -386,10 +392,10 @@ elif page == "Analisis":
 
                         if selected_season and selected_position:
                             if selected_club and selected_club != "Semua":
-                                # DENGAN FILTER KLUB
+                                # BACA DATA PEMAIN DENGAN FILTER KLUB
                                 players = get_players_by_season_and_club(selected_league, selected_season, selected_position, selected_club)
                             else:
-                                # TANPA FILTER KLUB                        
+                                # BACA DATA PEMAIN TANPA FILTER KLUB                        
                                 players = get_players_by_season(selected_league, selected_season, selected_position)
                         else:
                             players = []
@@ -401,6 +407,7 @@ elif page == "Analisis":
                         selected_player = None
                         selected_position = None
 
+# =========================================================================================================================
                 # UNTUK RESET STATE
                 st.session_state.setdefault("prev_season", None)
                 st.session_state.setdefault("prev_position", None)
@@ -437,7 +444,7 @@ elif page == "Analisis":
                 st.session_state["prev_position"] = selected_position
                 st.session_state["prev_anchor"]   = selected_player
                 st.session_state["prev_club_filter"] = st.session_state.get("club_filter")
-                # -------------------------------------------------------------------------
+# =========================================================================================================================
                 
                 # STATISTIK PEMAIN ACUAN
                 if selected_season and selected_position and selected_player and selected_player != "Pilih Pemain Acuan":
@@ -622,9 +629,9 @@ elif page == "Analisis":
                                                         st.altair_chart(chart)
 
 # ===============================
-# HALAMAN ABOUT
+# HALAMAN Tentang
 # ===============================
-elif page == "About":
+elif page == "Tentang":
     st.header("Tentang Saya")
 
     c1, c2 = st.columns([1,7])
@@ -643,19 +650,19 @@ elif page == "About":
             Universitas Tarumanagara
         """)
 
-    st.header("Tentang Website")
+    st.header("Tentang Sistem")
 
     c3, c4 = st.columns([2,1])
 
     with c3:
         st.markdown("""
-        Website ini dikembangkan sebagai sistem rekomendasi pemain sepak bola berbasis statistik.
+        Sistem rancangan ini dikembangkan sebagai sistem rekomendasi pemain sepak bola berbasis statistik.
         Tujuannya adalah membantu tim - tim liga Indonesia menemukan pemain lokal yang performanya mirip dengan pemain asing,
         menggunakan algoritma **Mean Shift** dan **Cosine Similarity**.
     """)
 
     st.markdown("""
-    Website ini dibangun dengan:
+    Sistem ini dibangun dengan:
     - **Python** digunakan sebagai bahasa pemrograman utama
     - **Streamlit** digunakan untuk membangun UI website
     - **Django** digunakan sebagai ORM untuk mengelola database

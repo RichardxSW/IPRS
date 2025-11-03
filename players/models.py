@@ -1,7 +1,7 @@
 from django.db import models
 
     
-# MODEL UNTUK DATA MUSIM
+# MODEL UNTUK DATA LIGA
 class League(models.Model):
     league_name=models.CharField(max_length=50)
     season=models.CharField(max_length=50)

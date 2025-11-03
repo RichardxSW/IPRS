@@ -27,6 +27,7 @@ POSITION_CHOICES = [
     "RB"
 ]
 
+# KOLOM NUMERIK
 NUM_COLS = [
     "Age","Appearance","Total Minute","Total Goal","Goal/game","Shot/game","SoT/game",
     "Assist","Assist/game","Success Dribble/game","Key Pass/game","Successful Pass/game",
@@ -35,6 +36,7 @@ NUM_COLS = [
     "Total duel won/game","Aerial duel won/game"
 ]
 
+# UNTUK TEMPLATE DATASET
 TEMPLATE_DATA = {
     "Player": ["Marc Klok", "Beckham Putra Nugraha"],
     "Team": ["Persib Bandung", "Persib Bandung"],
@@ -63,12 +65,14 @@ TEMPLATE_DATA = {
     "Aerial duel won/game": [5, 1],
 }
 
+# UNTUK RESET SESSION REKOMENDASI
 def clear_recommend_state(st):
     st.session_state["recommend_state"] = None
     st.session_state["features"] = None
     st.session_state["compare_recommend"] = None
     return st
 
+# UNTUK RESET SESSION CLUSTERING
 def clear_cluster_state(st):
     st.session_state["cluster_result"] = None
     st.session_state["selected_season"] = None
@@ -290,7 +294,7 @@ def get_player_detail(season: str, player_name: str) -> dict | None:
         .first()
     )
 
-#BACA DETAIL MUSIM YANG TERSIMPAN
+#AMBIL DETAIL MUSIM YANG TERSIMPAN
 def get_list_of_season():
     return list(
         League.objects

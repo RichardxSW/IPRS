@@ -1,7 +1,6 @@
 import pandas as pd
 from typing import Dict, List, Any
 
-# UNTUK VALIDASI JIKA BAR CHART TIDAK BISA DITAMPILKAN
 class BarDataMissing(Exception):
     pass
 
@@ -14,8 +13,9 @@ def get_features_for_group(group_name: str, features_by_position: Dict[str, List
     
     return features
 
-# BAR CHART UNTUK HASIL CLUSTERING
+# UNTUK BAR CHART FITUR PER CLUSTER
 def get_cluster_feature_chart_data(results: Dict[str, Any], features: List[str]) -> pd.DataFrame:
+    # VALIDASI JIKA SILHOUETTE TERBAIK TIDAK ADA
     if "best_silhouette" not in results or not results["best_silhouette"]:
         raise BarDataMissing("Silhouette terbaik tidak ditemukan.")
     
