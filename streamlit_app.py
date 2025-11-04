@@ -1,7 +1,7 @@
 import os, sys, datetime as dt
 import streamlit as st
 
-# === INIT DJANGO
+# === INIT DJANGO ============================================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(BASE_DIR)
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
@@ -12,7 +12,8 @@ st.set_page_config(page_title="IPRS", layout="wide")
 
 from page.analisis import get_analisis_page
 from page.unggah_dataset import get_unggah_dataset_page
-# ====== STYLE ======
+
+# ====== STYLE ==========================
 st.markdown(
     """
         <style>
@@ -33,10 +34,10 @@ st.markdown(
     """, 
     unsafe_allow_html=True
 )
+# ========================================
 
-# =========================
+# ==================================================================================================================================================================
 # SIDEBAR
-# =========================
 st.sidebar.title("FPRS")
 if "page" not in st.session_state:
     st.session_state.page = "Beranda"
@@ -53,7 +54,6 @@ for label, target in sidebar_map.items():
     if st.sidebar.button(label, key=f"nav_{label}"):
         clicked_page = target
 
-# hanya ubah page jika tombol berbeda
 if clicked_page and st.session_state.page != clicked_page:
     st.session_state.page = clicked_page
     # st.rerun()
@@ -61,12 +61,12 @@ if clicked_page and st.session_state.page != clicked_page:
 # for label, target in sidebar_map.items():
 #     if st.sidebar.button(label):
 #         st.session_state.page = target
+# ==================================================================================================================================================================
 
 page = st.session_state.page
 
-# =========================
+# ==================================================================================================================================================================
 # HALAMAN BERANDA
-# =========================
 if page == "Beranda":
     st.title("Sistem Rekomendasi Pemain Sepak Bola")
     st.markdown(
@@ -98,22 +98,22 @@ if page == "Beranda":
 
     if st.button("Mulai Analisis Sekarang 🚀"):
         st.session_state.page = "Analisis"        
+# ==================================================================================================================================================================
 
 # =============================
 # HALAMAN UNGGAH DATASET
-# =============================
 elif page == "Unggah Dataset":
     get_unggah_dataset_page(st)
+# ================================
 
 # ================================
 # HALAMAN ANALISIS
-# ================================
 elif page == "Analisis":
     get_analisis_page(st)
+# ===============================
 
-# ===============================
+# ==================================================================================================================================================================
 # HALAMAN Tentang
-# ===============================
 elif page == "Tentang":
     st.header("Tentang Saya")
 
@@ -160,4 +160,4 @@ elif page == "Tentang":
 
     st.header("Kontak")
     st.markdown("[richard.s050804@gmail.com](https://mail.google.com/mail/?view=cm&fs=1&to=richard.s050804@gmail.com) | [GitHub](https://github.com/RichardxSW)")
-
+# ==================================================================================================================================================================

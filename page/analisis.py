@@ -60,7 +60,7 @@ def get_analisis_page(st):
                         with st.spinner("Sedang menjalankan clustering..."):
                             result = run_meanshift_by_position(selected_league, selected_season)
                         st.session_state.cluster_result = result
-                        st.session_state.selected_season = selected_season                
+                        st.session_state.selected_season = selected_season
                         st.success("Clustering berhasil.")
 
                 # HASIL CLUSTERING

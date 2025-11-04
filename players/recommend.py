@@ -54,7 +54,6 @@ def get_recommend_similar_players(
     if not group:
         raise ValueError("Posisi tidak valid.")
 
-    # all_results = run_meanshift_by_position(league, season)
     results = result.get(group)
 
     if not results or not results.get("best_silhouette"):
@@ -110,6 +109,7 @@ def get_recommend_similar_players(
         anchor_team = str(players.loc[anchor_player, "team"]).strip().lower()
         recommend_result = recommend_result[recommend_result["team"].str.strip().str.lower() != anchor_team]
         
+    # SORT DARI NILAI COSINE SIM PALING GEDE DAN NAMPILIN SESUAI JUMLAH YANG DIINPUT        
     recommend_result = recommend_result.sort_values("similarity", ascending=False).head(recommend_count)
 
     return recommend_result.reset_index(drop=True)
