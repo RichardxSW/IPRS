@@ -2,8 +2,9 @@ import math
 import re
 import numpy as np
 import pandas as pd
-from players.clustering import POSITION_GROUPS, run_meanshift_by_position
+from players.clustering import POSITION_GROUPS
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.preprocessing import normalize
 
 # FITUR YANG AKAN DITAMPILKAN DALAM HASIL PERBANDINGAN
 FEATURES_TO_COMPARE = [
@@ -23,7 +24,7 @@ def group_for_position(position_code: str) -> str | None:
             return group
     return None
 
-# Ubah posisi jadi (huruf besar, spasi, /, -, koma).
+# FORMAT POSISI 
 def format_position(position_str) -> set[str]:    
     if position_str is None:
         return set()
@@ -40,8 +41,7 @@ def matches_position(position_str: str, anchor_position: set[str]) -> bool:
 
 # MENCARI PEMAIN REKOMENDASI DAN MENGHITUNG COSINE SIMILARITY
 def get_recommend_similar_players(
-    league,
-    season: str,
+    result,
     position_code: str,
     anchor_player: str,
     recommend_count: int = 10,
@@ -50,11 +50,13 @@ def get_recommend_similar_players(
     diff_club: bool = False
 ):
     group = group_for_position(position_code)
-    if not group:
-        raise ValueError("Kode posisi tidak valid.")
 
-    all_results = run_meanshift_by_position(league, season)
-    results = all_results.get(group)
+    if not group:
+        raise ValueError("Posisi tidak valid.")
+
+    # all_results = run_meanshift_by_position(league, season)
+    results = result.get(group)
+
     if not results or not results.get("best_silhouette"):
         return pd.DataFrame()
 
@@ -62,54 +64,55 @@ def get_recommend_similar_players(
     X_scaled = results["X_scaled"]
     players = results["players"].copy()
 
-    # cari pemain acuan
+    # PEMAIN ACUAN
     anchor = players["player_name"].str.lower() == str(anchor_player).lower()
+
     if not anchor.any():
         return pd.DataFrame()
 
-    anchor_idx = int(players[anchor].index[0])
-    anchor_cluster = int(labels[anchor_idx])
-    anchor_position_str = players.loc[anchor_idx, "position"]
+    anchor_player = int(players[anchor].index[0])
+    anchor_cluster = int(labels[anchor_player])
+    anchor_position_str = players.loc[anchor_player, "position"]
     anchor_position = format_position(anchor_position_str)
 
-    # ambil hanya pemain dalam cluster yang sama
-    same_idx = np.where(labels == anchor_cluster)[0]
-    if same_idx.size <= 1:
+    # ambil pemain dalam cluster yang sama dengan pemain acuan
+    same_cluster = np.where(labels == anchor_cluster)[0]
+    if same_cluster.size <= 1:
         return pd.DataFrame()
 
     # filter Pemain Indonesia saja
     if "nationality" in players.columns and only_indonesian:
-        same_idx = [i for i in same_idx if str(players.loc[i, "nationality"]).strip().lower() == "indonesia"]
-        if len(same_idx) <= 1:
+        same_cluster = [i for i in same_cluster if str(players.loc[i, "nationality"]).strip().lower() == "indonesia"]
+        if len(same_cluster) <= 1:
             return pd.DataFrame()
 
     # FILTER POSISI YANG SAMA DENGAN PEMAIN ACUAN
     if "position" in players.columns and filter_position:
-        same_idx = [j for j in same_idx if matches_position(players.loc[j, "position"], anchor_position)]
+        same_cluster = [j for j in same_cluster if matches_position(players.loc[j, "position"], anchor_position)]
 
     # DATA PEMAIN ACUAN
-    anchor_vec = X_scaled[anchor_idx:anchor_idx+1]
+    anchor_data = X_scaled[anchor_player:anchor_player+1]
 
     # DATA PEMAIN DALAM CLUSTER YANG SAMA
-    cluster_vecs = X_scaled[same_idx]
+    same_cluster_data = X_scaled[same_cluster]
 
     # hitung cosine similarity antara pemain acuan dan pemain dalam cluster yg sama
-    cos_sim = cosine_similarity(anchor_vec, cluster_vecs).ravel()
+    cos_sim = cosine_similarity(anchor_data, same_cluster_data).ravel()
 
-    out = players.iloc[same_idx].copy()
-    out["similarity"] = cos_sim
+    recommend_result = players.iloc[same_cluster].copy()
+    recommend_result["similarity"] = cos_sim
 
     # MEMBUANG PEMAIN ACUAN
-    out = out[out.index != anchor_idx]
+    recommend_result = recommend_result[recommend_result.index != anchor_player]
 
     # FILTER KLUB
     if diff_club and "team" in players.columns:
-        anchor_team = str(players.loc[anchor_idx, "team"]).strip().lower()
-        out = out[out["team"].str.strip().str.lower() != anchor_team]
+        anchor_team = str(players.loc[anchor_player, "team"]).strip().lower()
+        recommend_result = recommend_result[recommend_result["team"].str.strip().str.lower() != anchor_team]
         
-    out = out.sort_values("similarity", ascending=False).head(recommend_count)
+    recommend_result = recommend_result.sort_values("similarity", ascending=False).head(recommend_count)
 
-    return out.reset_index(drop=True)
+    return recommend_result.reset_index(drop=True)
 
 # MEMBACA FITUR UNTUK YANG DIPAKAI UNTUK PEMAIN ACUAN DAN PEMAIN REKOMENDASI
 def get_feature_data(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> tuple[pd.Series, pd.Series]:

@@ -21,19 +21,20 @@ def get_cluster_feature_chart_data(results: Dict[str, Any], features: List[str])
     
     labels = results["best_silhouette"].get("labels")
     all_features = results.get("features")
+
     if all_features is None:
         raise BarDataMissing("Fitur tidak ditemukan")
 
     feature = all_features[features].copy()
     feature["cluster"] = labels
 
-    agg = (
+    aggregate = (
         feature.groupby("cluster", as_index=False)[features]
         .mean(numeric_only=True)
         .sort_values("cluster")
     )
 
-    chart_data = agg.melt(id_vars="cluster", var_name="Fitur", value_name="Mean")
+    chart_data = aggregate.melt(id_vars="cluster", var_name="Fitur", value_name="Mean")
     chart_data["Cluster"] = chart_data["cluster"].apply(lambda c: f"C{int(c)}")
     chart_data.drop(columns=["cluster"], inplace=True)
     return chart_data

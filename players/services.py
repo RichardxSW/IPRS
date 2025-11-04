@@ -41,7 +41,8 @@ TEMPLATE_DATA = {
     "Player": ["Marc Klok", "Beckham Putra Nugraha"],
     "Team": ["Persib Bandung", "Persib Bandung"],
     "Nationality": ["Indonesia","Indonesia"],
-    "Position": ["DM", "RW"],
+    "Naturalisasi": ["TRUE", "FALSE"],
+    "Position": ["CM, DM", "RW"],
     "Age": [32, 24],
     "Appearance": [34, 29],
     "Total Minute": [3060, 1975],
@@ -75,15 +76,15 @@ def clear_recommend_state(st):
 # UNTUK RESET SESSION CLUSTERING
 def clear_cluster_state(st):
     st.session_state["cluster_result"] = None
-    st.session_state["selected_season"] = None
+    # st.session_state["selected_season"] = None
     return st
 
 #VALIDASI FITUR PADA DATASET
 def get_required(row, columns, key, string=False):
-    if key not in columns:
+    if key.lower() not in columns:
         raise KeyError(f"Kolom {key} harus ada di dataset.")
                     
-    val = row[columns[key]]
+    val = row[columns[key.lower()]]
 
     if pd.isna(val):
         return None
@@ -109,43 +110,59 @@ def post_dataset(league_name: str, season: str, df: pd.DataFrame) -> int:
     # CEK APAKAH SUDAH ADA DATA DENGAN MUSIM TERSEBUT
     if League.objects.filter(league_name=league_name.strip(), season=season.strip()).exists():
         raise ValidationError(f"Data untuk {league_name} musim {season} sudah ada.")
+    
+    # CEK APAKAH ROW DATA SUDAH LENGKAP
+    POSITION_REQUIRED = ["ST","LW","RW","CM","DM","CB","LB","RB"]
+    MIN_PER_POSITION = 18
+    position_counts = {p: 0 for p in POSITION_REQUIRED}
+    for pos_str in df["Position"]:
+        position_str = str(pos_str).upper().replace(" ", "")
+        position = set(position_str.split(",")) if "," in position_str else {position_str}
+        for p in POSITION_REQUIRED:
+            if p in position:
+                position_counts[p] += 1
 
-    ds, created = League.objects.get_or_create(
+    position_check = [p for p, count in position_counts.items() if count < MIN_PER_POSITION]
+    if position_check:
+        raise ValidationError(
+            "Data belum lengkap."
+        )
+
+    # MENYIMPAN LIGA
+    ds = League.objects.create(
         league_name=league_name.strip(),
         season=season.strip()
     )
-    if not created:
-        ds.players.all().delete()
 
-    # VALIDASI VARIABEL
+    # VALIDASI VARIABEL HARUS ADA
     bulk = []
     for _, row in df.iterrows():
-        player = get_required(row, column, "player", string=True)
-        team = get_required(row, column, "team", string=True)
-        nat = get_required(row, column, "nationality", string=True)
-        naturalisasi = get_required(row, column, "naturalisasi")
-        pos  = get_required(row, column, "position", string=True)
-        age  = get_required(row, column, "age")
-        app  = get_required(row, column, "appearance")
-        total_minute  = get_required(row, column, "total minute")
-        total_goal  = get_required(row, column, "total goal")
-        goal_pg = get_required(row, column, "goal/game")
-        shot_pg = get_required(row, column, "shot/game")
-        sot_pg = get_required(row, column, "sot/game")
-        assist = get_required(row, column, "assist")
-        assist_pg = get_required(row, column, "assist/game")
-        dribble_pg = get_required(row, column, "successful dribble/game")
-        keypass_pg = get_required(row, column, "key pass/game")
-        pass_pg = get_required(row, column, "successful pass/game")
-        longball_pg = get_required(row, column, "long ball/game")
-        crossing_pg = get_required(row, column, "successful crossing/game")
-        ballrecovered_pg = get_required(row, column, "ball recovered/game")
-        dribbledpast_pg = get_required(row, column, "dribbled past/game")
-        clearance_pg = get_required(row, column, "clearance/game")
-        error = get_required(row, column, "error leading to shot")
-        error_pg = get_required(row, column, "error leading to shot/game")
-        totalduel_pg = get_required(row, column, "total duel won/game")
-        aerialduel_pg = get_required(row, column, "aerial duel won/game")
+        player = get_required(row, column, "Player", string=True)
+        team = get_required(row, column, "Team", string=True)
+        nat = get_required(row, column, "Nationality", string=True)
+        naturalisasi = get_required(row, column, "Naturalisasi", string=True)
+        pos  = get_required(row, column, "Position", string=True)
+        age  = get_required(row, column, "Age")
+        app  = get_required(row, column, "Appearance")
+        total_minute  = get_required(row, column, "Total Minute")
+        total_goal  = get_required(row, column, "Total Goal")
+        goal_pg = get_required(row, column, "Goal/Game")
+        shot_pg = get_required(row, column, "Shot/Game")
+        sot_pg = get_required(row, column, "Sot/Game")
+        assist = get_required(row, column, "Assist")
+        assist_pg = get_required(row, column, "Assist/game")
+        dribble_pg = get_required(row, column, "Successful Dribble/Game")
+        keypass_pg = get_required(row, column, "Key Pass/Game")
+        pass_pg = get_required(row, column, "Successful Pass/Game")
+        longball_pg = get_required(row, column, "Long Ball/Game")
+        crossing_pg = get_required(row, column, "Successful Crossing/Game")
+        ballrecovered_pg = get_required(row, column, "Ball Recovered/Game")
+        dribbledpast_pg = get_required(row, column, "Dribbled Past/Game")
+        clearance_pg = get_required(row, column, "Clearance/Game")
+        error = get_required(row, column, "Error Leading to Shot")
+        error_pg = get_required(row, column, "Error leading to Shot/Game")
+        totalduel_pg = get_required(row, column, "Total Duel Won/Game")
+        aerialduel_pg = get_required(row, column, "Aerial Duel Won/Game")
 
         bulk.append(
             Player(
@@ -207,7 +224,7 @@ def get_clubs_by_season(selected_league, season: str) -> List[str]:
         .values_list("team", flat=True)
         .distinct()
     )
-    print(len(club))
+    # print(len(club))
     return club
 
 # AMBIL DATA PEMAIN
@@ -228,7 +245,7 @@ def get_players_by_season(selected_league, season: str, position: str) -> List[s
             )
         ).order_by("player_name").values_list("player_name", flat=True)
     )
-    print(len(players))
+    # print(len(players))
     return players
 
 # AMBIL DATA PEMAIN DENGAN FILTER KLUB
@@ -251,11 +268,11 @@ def get_players_by_season_and_club(selected_league, season: str, position: str, 
             output_field=CharField()
         )
     ).order_by("player_name").values_list("player_name", flat=True))
-    print(len(players))
+    # print(len(players))
     return players
 
 # DOWNLOAD TEMPLATE DATASET
-def build_template_file(df) -> bytes:    
+def build_template_file(df) -> bytes:
     buf = io.BytesIO()
     with pd.ExcelWriter(buf, engine="xlsxwriter") as writer:
         df.to_excel(writer, index=False, sheet_name="Template Dataset")

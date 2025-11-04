@@ -9,16 +9,14 @@ from .models import Player, League
 from django.db.models import Case, When, Value, F, CharField
 from django.db.models.functions import Concat
 
-# =============================
 # KATEGORI POSISI PEMAIN
-# =============================
 POSITION_GROUPS = {
     "Pemain Penyerang": ["ST", "LW", "RW"],
     "Pemain Gelandang": ["AM", "CM", "DM", "LM", "RM"],
     "Pemain Bertahan": ["CB", "LB", "RB"],
 }
 
-# FITUR YANG DIGUNAKAN UNTUK CLUSTERING PER KATEGORI POSISI PEMAIN
+# STATISTIK YANG DIGUNAKAN UNTUK CLUSTERING PER KATEGORI POSISI PEMAIN
 FEATURES_BY_POSITION = {
     "Pemain Penyerang": [
         "goal_per_game", "shot_per_game", "sot_per_game", "assist_per_game", "successful_dribble_per_game", 
@@ -36,14 +34,14 @@ FEATURES_BY_POSITION = {
     ],
 }
 
-# FITUR YANG TIDAK TERPAKAI UNTUK CLUSTERING
+# VARIABEL YANG TIDAK TERPAKAI UNTUK CLUSTERING
 META_COLUMNS = [
     "id", "player_name", "team", "position", "nationality",
     "age", "appearance", "total_minute",
     "total_goal", "assist", "error"
 ]
 
-# LABEL FITUR UNTUK DITAMPILKAN 
+# LABEL VARIABEL UNTUK DITAMPILKAN 
 FEATURE_LABELS = {
     "age": "Age",
     "appearance": "Appearances",
