@@ -159,10 +159,8 @@ def run_meanshift(df: pd.DataFrame, features):
     } for r in results])
 
     valid_silhouette = [r for r in results if r["silhouette"] is not None and r['silhouette'] != '-']
-    valid_dbi = [r for r in results if r["dbi"] and r['dbi'] is not None and r['dbi'] != '-']
+    
     best_silhouette = max(valid_silhouette, key=lambda r: r["silhouette"]) if valid_silhouette else None
-    best_dbi = min(valid_dbi, key=lambda r: r["dbi"]) if valid_dbi else None
-    same_bw = best_silhouette and best_dbi and best_silhouette["bw"] == best_dbi["bw"]
 
     return {
         "cluster_result": cluster_result,
@@ -171,15 +169,13 @@ def run_meanshift(df: pd.DataFrame, features):
         "players": df.reset_index(drop=True),
         "features": df[features].reset_index(drop=True),
         "best_silhouette": best_silhouette,
-        "best_dbi": best_dbi,
-        "same_bw": same_bw,
     }
 
 # MENJALANKAN MEAN SHIFT PER KATEGORI POSISI PEMAIN
 def run_meanshift_by_position(selected_league, season: str):
     players = get_player_features_data(selected_league, season)
     if players.empty:
-        return {"Forward": None, "Midfielder": None, "Defender": None}
+        return {"Pemain Penyerang": None, "Pemain Gelandang": None, "Pemain Bertahan": None}
 
     results = {}
     for group, positions in POSITION_GROUPS.items():
@@ -187,10 +183,8 @@ def run_meanshift_by_position(selected_league, season: str):
             lambda p: any(pos in str(p).upper().replace(" ", "").split(",") or
                           pos in str(p).upper().replace(" ", "") for pos in positions)
         )]
-        features = FEATURES_BY_POSITION[group]
-        if len(player_by_position) < 3:
-            results[group] = None
-            continue
+        features = FEATURES_BY_POSITION[group]  
+
         results[group] = run_meanshift(player_by_position, features)
 
     return results

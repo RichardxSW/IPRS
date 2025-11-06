@@ -224,7 +224,6 @@ def get_clubs_by_season(selected_league, season: str) -> List[str]:
         .values_list("team", flat=True)
         .distinct()
     )
-    # print(len(club))
     return club
 
 # AMBIL DATA PEMAIN
@@ -245,7 +244,6 @@ def get_players_by_season(selected_league, season: str, position: str) -> List[s
             )
         ).order_by("player_name").values_list("player_name", flat=True)
     )
-    # print(len(players))
     return players
 
 # AMBIL DATA PEMAIN DENGAN FILTER KLUB
@@ -255,6 +253,7 @@ def get_players_by_season_and_club(selected_league, season: str, position: str, 
         league__season=season,
         position__icontains=position,
     )
+
     if club and club.lower() != "semua":
         qs = qs.filter(team__iexact=club)
 
@@ -268,7 +267,6 @@ def get_players_by_season_and_club(selected_league, season: str, position: str, 
             output_field=CharField()
         )
     ).order_by("player_name").values_list("player_name", flat=True))
-    # print(len(players))
     return players
 
 # DOWNLOAD TEMPLATE DATASET
