@@ -30,7 +30,7 @@ POSITION_CHOICES = [
 # KOLOM NUMERIK
 NUM_COLS = [
     "Age","Appearance","Total Minute","Total Goal","Goal/game","Shot/game","SoT/game",
-    "Assist","Assist/game","Success Dribble/game","Key Pass/game","Successful Pass/game",
+    "Assist","Assist/game","Successful Dribble/game","Key Pass/game","Successful Pass/game",
     "Long Ball/game","Successful Crossing/game","Ball Recovered/game","Dribbled Past/game",
     "Clearance/game","Error leading to shot","Error leading to shot/game",
     "Total duel won/game","Aerial duel won/game"
@@ -52,7 +52,7 @@ TEMPLATE_DATA = {
     "SoT/game": [1, 1],
     "Assist": [3, 6],
     "Assist/game": [1, 1.5],
-    "Success Dribble/game": [4, 8],
+    "Successful Dribble/game": [4, 8],
     "Key Pass/game": [1, 2],
     "Successful Pass/game": [20, 15],
     "Long Ball/game": [10, 2],
@@ -100,6 +100,32 @@ def get_required(row, columns, key, string=False, boolean=False):
             return str(val)
         else:
             raise ValidationError(f"Kolom {key} harus bernilai TRUE atau FALSE.")
+        
+    if key == "Position":
+        allowed_positions = POSITION_CHOICES[1:]
+
+        # Normalisasi separator: &, /, ; -> koma
+        s = str(val).upper()
+        s = s.replace("&", ",").replace("/", ",").replace(";", ",")
+        tokens = [t.strip() for t in s.split(",") if t.strip()]
+
+        invalid = [t for t in tokens if t not in allowed_positions]
+        if invalid:
+            allowed = ", ".join(sorted(allowed_positions))
+            raise ValidationError(
+                f"Dataset mengandung posisi tidak valid: {invalid}. "
+                f"Posisi yang diizinkan: {allowed}."
+            )
+
+        return ",".join(tokens)
+    
+    if key == "Team":
+        team_name = str(val).strip().upper()
+        return team_name
+    
+    if key == "Nationality":
+        nationality = str(val).strip().title()
+        return nationality
     
     return str(val).strip() if string else val
 
@@ -125,20 +151,20 @@ def post_dataset(league_name: str, season: str, df: pd.DataFrame) -> int:
     
     # CEK APAKAH ROW DATA SUDAH LENGKAP
     POSITION_REQUIRED = ["ST","LW","RW","CM","DM","CB","LB","RB"]
-    MIN_PER_POSITION = 18
-    position_counts = {p: 0 for p in POSITION_REQUIRED}
-    for pos_str in df["Position"]:
-        position_str = str(pos_str).upper().replace(" ", "")
-        position = set(position_str.split(",")) if "," in position_str else {position_str}
-        for p in POSITION_REQUIRED:
-            if p in position:
-                position_counts[p] += 1
+    
+    # position_counts = {p: 0 for p in POSITION_REQUIRED}
+    # for pos_str in df["Position"]:
+    #     position_str = str(pos_str).upper().replace(" ", "")
+    #     position = set(position_str.split(",")) if "," in position_str else {position_str}
+    #     for p in POSITION_REQUIRED:
+    #         if p in position:
+    #             position_counts[p] += 1
 
-    position_check = [p for p, count in position_counts.items() if count < MIN_PER_POSITION]
-    if position_check:
-        raise ValidationError(
-            "Data belum lengkap."
-        )
+    # position_check = [p for p, count in position_counts.items() if count < 18]
+    # if position_check:
+    #     raise ValidationError(
+    #         "Data belum lengkap."
+    #     )
 
     # MENYIMPAN LIGA
     ds = League.objects.create(
