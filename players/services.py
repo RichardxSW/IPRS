@@ -80,7 +80,7 @@ def clear_cluster_state(st):
     return st
 
 #VALIDASI FITUR PADA DATASET
-def get_required(row, columns, key, string=False):
+def get_required(row, columns, key, string=False, boolean=False):
     if key.lower() not in columns:
         raise KeyError(f"Kolom {key} harus ada di dataset.")
                     
@@ -88,6 +88,18 @@ def get_required(row, columns, key, string=False):
 
     if pd.isna(val):
         return None
+    
+    if not string and not boolean:
+        try:
+            val = float(val)
+        except ValueError:
+            raise ValidationError(f"Kolom {key} harus bernilai numerik. (contoh: 2 atau 2,5)")
+        
+    if boolean:        
+        if str(val).lower() in ["true", "false"]:
+            return str(val)
+        else:
+            raise ValidationError(f"Kolom {key} harus bernilai TRUE atau FALSE.")
     
     return str(val).strip() if string else val
 
@@ -140,7 +152,7 @@ def post_dataset(league_name: str, season: str, df: pd.DataFrame) -> int:
         player = get_required(row, column, "Player", string=True)
         team = get_required(row, column, "Team", string=True)
         nat = get_required(row, column, "Nationality", string=True)
-        naturalisasi = get_required(row, column, "Naturalisasi", string=True)
+        naturalisasi = get_required(row, column, "Naturalisasi", boolean=True)
         pos  = get_required(row, column, "Position", string=True)
         age  = get_required(row, column, "Age")
         app  = get_required(row, column, "Appearance")
@@ -160,7 +172,7 @@ def post_dataset(league_name: str, season: str, df: pd.DataFrame) -> int:
         dribbledpast_pg = get_required(row, column, "Dribbled Past/Game")
         clearance_pg = get_required(row, column, "Clearance/Game")
         error = get_required(row, column, "Error Leading to Shot")
-        error_pg = get_required(row, column, "Error leading to Shot/Game")
+        error_pg = get_required(row, column, "Error Leading to Shot/Game")
         totalduel_pg = get_required(row, column, "Total Duel Won/Game")
         aerialduel_pg = get_required(row, column, "Aerial Duel Won/Game")
 

@@ -38,7 +38,7 @@ st.markdown(
 
 # ==================================================================================================================================================================
 # SIDEBAR
-st.sidebar.title("FPRS")
+# st.sidebar.title("FPRS")
 if "page" not in st.session_state:
     st.session_state.page = "Beranda"
 
