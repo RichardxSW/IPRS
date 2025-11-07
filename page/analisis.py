@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from players.bar_chart import BarDataMissing, get_cluster_feature_chart_data, get_features_for_group
 from players.clustering import FEATURE_LABELS, FEATURES_BY_POSITION, get_cluster_members_data, get_player_features_data, run_meanshift_by_position
-from players.recommend import FEATURES_TO_COMPARE, get_comparison_chart_data, get_recommend_similar_players
+from players.recommend import FEATURES_TO_COMPARE, fm_compare_hconcat, fm_style_compare_chart, get_comparison_chart_data, get_recommend_similar_players
 from players.services import POSITION_CHOICES, clear_cluster_state, clear_recommend_state, get_clubs_by_season, get_leagues, get_player_detail, get_players_by_season, get_players_by_season_and_club, get_seasons
 import altair as alt
 
@@ -153,10 +153,10 @@ def get_analisis_page(st):
                                 clusters_order = sorted(chart_data["Cluster"].unique(), key=lambda s: int(s[1:]))
                                 chart_data["Cluster"] = pd.Categorical(chart_data["Cluster"], categories=clusters_order, ordered=True)
 
-                                c1, c2, c3 = st.columns(3, vertical_alignment="top")
+                                c1, c2 = st.columns(2, vertical_alignment="top")
                                 
                                 if len(features) > 0:
-                                    columns= [c1, c2, c3]
+                                    columns= [c1, c2]
                                     for i, fitur in enumerate(features):
                                         sub = chart_data[chart_data["Fitur"] == fitur]
 
@@ -184,7 +184,7 @@ def get_analisis_page(st):
                                                 height=220,
                                             )
                                         )
-                                        with columns[i % 3]:
+                                        with columns[i % 2]:
                                             st.altair_chart(chart)
                                 else:
                                     st.info("Tidak ada statistik yang ditemukan.")
@@ -397,47 +397,80 @@ def get_analisis_page(st):
                             # PERBANDINGAN STATISTIK PEMAIN ACUAN DENGAN PEMAIN REKOMENDASI
                             target_player = st.session_state["compare_recommend"]
                             if target_player and features is not None:
-                                with st.expander(f"Perbandingan {selected_player} dengan {target_player}", expanded=True):                                
-                                    try:
-                                        # MENGAMBIL DATA PERBANDINGAN STATISTIK
-                                        chart_data = get_comparison_chart_data(
-                                            features=features,
-                                            anchor_player=selected_player,
-                                            target_player=target_player,
-                                            features_to_compare=FEATURES_TO_COMPARE
-                                        )
-                                    except ValueError as e:
-                                        st.error(str(e))
-                                    else:                               
-                                        # MENAMPILKAN BAR CHART PERBANDINGAN STATISTIK
-                                        N_COLS = 2
-                                        fitur_list = list(chart_data["Fitur"].unique())
-                                        for start in range(0, len(fitur_list), N_COLS):
-                                            columns_plot = st.columns(N_COLS)
-                                            batch = fitur_list[start:start+N_COLS]
-                                            for c, fitur in zip(columns_plot, batch):
-                                                sub = chart_data[chart_data["Fitur"] == fitur]
-                                                chart_title = FEATURE_LABELS.get(fitur, fitur)
-                                                chart = (
-                                                    alt.Chart(sub)
-                                                    .mark_bar()
-                                                    .encode(
-                                                        x=alt.X("Pemain:N", axis=alt.Axis(title=None, labelAngle=0)),
-                                                        y=alt.Y("Nilai:Q", axis=alt.Axis(title=None)),
-                                                        color=alt.Color("Pemain:N", title=None, scale=alt.Scale(scheme="tableau10")),
-                                                        tooltip=["Pemain:N", "Nilai:Q"],
-                                                    )
-                                                    .properties(
-                                                        title={
-                                                            "text": chart_title,
-                                                            "anchor": "middle",
-                                                            "align": "center",                                                        
-                                                        },                                                    
-                                                        width="container", 
-                                                        height=220
-                                                    )
-                                                )
-                                                with c:
-                                                    st.altair_chart(chart)
+                                with st.expander(f"Perbandingan {selected_player} dengan {target_player}", expanded=True):
+                                    anchor_detail = get_player_detail(selected_season, selected_player)
+                                    target_detail = get_player_detail(selected_season, target_player)
+
+                                    if anchor_detail and target_detail:
+                                        c1, c2 = st.columns(2)
+                                        with c1:
+                                            st.markdown(
+                                                f"""
+                                                <div style="text-align:right">
+                                                    <div style="font-size:28px; font-weight:700;">{selected_player}</div>
+                                                    <div style="opacity:.75;">{anchor_detail.get('position')}, {anchor_detail.get('age')} yrs — {anchor_detail.get('nationality')}</div>
+                                                </div>
+                                                """,
+                                                unsafe_allow_html=True,
+                                            )
+                                        with c2:
+                                            st.markdown(
+                                                f"""
+                                                <div style="text-align:left">
+                                                    <div style="font-size:28px; font-weight:700;">{target_player}</div>
+                                                    <div style="opacity:.75;">{target_detail.get('position')}, {target_detail.get('age')} yrs — {target_detail.get('nationality')}</div>
+                                                </div>
+                                                """,
+                                                unsafe_allow_html=True,
+                                            )
+
+                                    fm_chart = fm_compare_hconcat(
+                                        features_df=features,                 # df fitur lengkap (bukan chart_data yang sudah melt)
+                                        anchor_player=selected_player,
+                                        target_player=target_player,
+                                        features_to_compare=FEATURES_TO_COMPARE,
+                                    )
+                                    st.altair_chart(fm_chart)
+                                    # try:
+                                    #     # MENGAMBIL DATA PERBANDINGAN STATISTIK
+                                    #     chart_data = get_comparison_chart_data(
+                                    #         features=features,
+                                    #         anchor_player=selected_player,
+                                    #         target_player=target_player,
+                                    #         features_to_compare=FEATURES_TO_COMPARE
+                                    #     )
+                                    # except ValueError as e:
+                                    #     st.error(str(e))
+                                    # else:                                    
+                                    #     # MENAMPILKAN BAR CHART PERBANDINGAN STATISTIK
+                                    #     N_COLS = 2
+                                    #     fitur_list = list(chart_data["Fitur"].unique())
+                                    #     for start in range(0, len(fitur_list), N_COLS):
+                                    #         columns_plot = st.columns(N_COLS)
+                                    #         batch = fitur_list[start:start+N_COLS]
+                                    #         for c, fitur in zip(columns_plot, batch):
+                                    #             sub = chart_data[chart_data["Fitur"] == fitur]
+                                    #             chart_title = FEATURE_LABELS.get(fitur, fitur)
+                                    #             chart = (
+                                    #                 alt.Chart(sub)
+                                    #                 .mark_bar()
+                                    #                 .encode(
+                                    #                     x=alt.X("Pemain:N", axis=alt.Axis(title=None, labelAngle=0)),
+                                    #                     y=alt.Y("Nilai:Q", axis=alt.Axis(title=None)),
+                                    #                     color=alt.Color("Pemain:N", title=None, scale=alt.Scale(scheme="tableau10")),
+                                    #                     tooltip=["Pemain:N", "Nilai:Q"],
+                                    #                 )
+                                    #                 .properties(
+                                    #                     title={
+                                    #                         "text": chart_title,
+                                    #                         "anchor": "middle",
+                                    #                         "align": "center",                                                        
+                                    #                     },                                                    
+                                    #                     width="container", 
+                                    #                     height=220
+                                    #                 )
+                                    #             )
+                                    #             with c:
+                                    #                 st.altair_chart(chart)
     
     return st
