@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from players.bar_chart import BarDataMissing, get_cluster_feature_chart_data, get_features_for_group
 from players.clustering import FEATURE_LABELS, FEATURES_BY_POSITION, get_cluster_members_data, get_player_features_data, run_meanshift_by_position
-from players.recommend import FEATURES_TO_COMPARE, fm_compare_hconcat, fm_style_compare_chart, get_comparison_chart_data, get_recommend_similar_players
+from players.recommend import FEATURES_TO_COMPARE, fm_compare_hconcat, get_recommend_similar_players
 from players.services import POSITION_CHOICES, clear_cluster_state, clear_recommend_state, get_clubs_by_season, get_leagues, get_player_detail, get_players_by_season, get_players_by_season_and_club, get_seasons
 import altair as alt
 
@@ -113,7 +113,7 @@ def get_analisis_page(st):
                                     if best_result and X_pca is not None:
                                         fig, ax = plt.subplots(figsize=(4,3))
                                         sc = ax.scatter(X_pca[:, 0], X_pca[:, 1], c=best_result["labels"], s=16, alpha=0.85)
-                                        ax.set_xlabel("PCA 1"); ax.set_ylabel("PCA 2")
+                                        ax.set_xlabel("PC1"); ax.set_ylabel("PC2")
                                         ax.set_title(f"{group_name}")
                                         uniq, counts = np.unique(best_result["labels"], return_counts=True)
                                         ax.legend(sc.legend_elements()[0], [f"C{c}: {n}" for c, n in zip(uniq, counts)], loc="best")
@@ -407,8 +407,12 @@ def get_analisis_page(st):
                                             st.markdown(
                                                 f"""
                                                 <div style="text-align:right">
-                                                    <div style="font-size:28px; font-weight:700;">{selected_player}</div>
-                                                    <div style="opacity:.75;">{anchor_detail.get('position')}, {anchor_detail.get('age')} yrs — {anchor_detail.get('nationality')}</div>
+                                                    <div style="font-size:28px; font-weight:600; color: orange">{selected_player}</div>
+                                                    <div style="opacity:1;">{anchor_detail.get('position')}</div>
+                                                    <div style="opacity:1;">{anchor_detail.get('age')} Years Old</div>
+                                                    <div style="opacity:1;">{anchor_detail.get('nationality')}</div>
+                                                    <div style="opacity:1;">{anchor_detail.get('appearance')} Appearances</div>
+                                                    <div style="opacity:1;">{anchor_detail.get('total_minute')} Minutes Played</div>
                                                 </div>
                                                 """,
                                                 unsafe_allow_html=True,
@@ -417,20 +421,25 @@ def get_analisis_page(st):
                                             st.markdown(
                                                 f"""
                                                 <div style="text-align:left">
-                                                    <div style="font-size:28px; font-weight:700;">{target_player}</div>
-                                                    <div style="opacity:.75;">{target_detail.get('position')}, {target_detail.get('age')} yrs — {target_detail.get('nationality')}</div>
+                                                    <div style="font-size:28px; font-weight:600; color: #3b82f6">{target_player}</div>
+                                                    <div style="opacity: 1;">{target_detail.get('position')}</div>
+                                                    <div style="opacity: 1;">{target_detail.get('age')} Years Old</div>
+                                                    <div style="opacity: 1;">{target_detail.get('nationality')}</div>
+                                                    <div style="opacity: 1;">{target_detail.get('appearance')} Appearances</div>
+                                                    <div style="opacity: 1;">{target_detail.get('total_minute')} Minutes Played</div>
                                                 </div>
                                                 """,
                                                 unsafe_allow_html=True,
                                             )
 
-                                    fm_chart = fm_compare_hconcat(
-                                        features_df=features,                 # df fitur lengkap (bukan chart_data yang sudah melt)
+                                    fm_compare_hconcat(
+                                        st,
+                                        features_df=features,
                                         anchor_player=selected_player,
                                         target_player=target_player,
                                         features_to_compare=FEATURES_TO_COMPARE,
                                     )
-                                    st.altair_chart(fm_chart)
+                                    # st.altair_chart(fm_chart)
                                     # try:
                                     #     # MENGAMBIL DATA PERBANDINGAN STATISTIK
                                     #     chart_data = get_comparison_chart_data(

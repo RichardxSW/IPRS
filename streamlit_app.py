@@ -8,7 +8,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "iprs.settings")
 import django
 django.setup()
 
-st.set_page_config(page_title="IPRS", layout="wide")
+st.set_page_config(page_title="Sistem Rekomendasi Pemain Sepak Bola", layout="wide")
 
 from page.analisis import get_analisis_page
 from page.unggah_dataset import get_unggah_dataset_page
