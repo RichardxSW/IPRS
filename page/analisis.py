@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from players.bar_chart import BarDataMissing, get_cluster_feature_chart_data, get_features_for_group
 from players.clustering import FEATURE_LABELS, FEATURES_BY_POSITION, get_cluster_members_data, get_player_features_data, run_meanshift_by_position
-from players.recommend import FEATURES_TO_COMPARE, fm_compare_hconcat, get_recommend_similar_players
+from players.recommend import FEATURES_TO_COMPARE, build_comparison_section, get_recommend_similar_players
 from players.services import POSITION_CHOICES, clear_cluster_state, clear_recommend_state, get_clubs_by_season, get_leagues, get_player_detail, get_players_by_season, get_players_by_season_and_club, get_seasons
 import altair as alt
 
@@ -432,54 +432,12 @@ def get_analisis_page(st):
                                                 unsafe_allow_html=True,
                                             )
 
-                                    fm_compare_hconcat(
+                                    build_comparison_section(
                                         st,
                                         features_df=features,
                                         anchor_player=selected_player,
                                         target_player=target_player,
                                         features_to_compare=FEATURES_TO_COMPARE,
-                                    )
-                                    # st.altair_chart(fm_chart)
-                                    # try:
-                                    #     # MENGAMBIL DATA PERBANDINGAN STATISTIK
-                                    #     chart_data = get_comparison_chart_data(
-                                    #         features=features,
-                                    #         anchor_player=selected_player,
-                                    #         target_player=target_player,
-                                    #         features_to_compare=FEATURES_TO_COMPARE
-                                    #     )
-                                    # except ValueError as e:
-                                    #     st.error(str(e))
-                                    # else:                                    
-                                    #     # MENAMPILKAN BAR CHART PERBANDINGAN STATISTIK
-                                    #     N_COLS = 2
-                                    #     fitur_list = list(chart_data["Fitur"].unique())
-                                    #     for start in range(0, len(fitur_list), N_COLS):
-                                    #         columns_plot = st.columns(N_COLS)
-                                    #         batch = fitur_list[start:start+N_COLS]
-                                    #         for c, fitur in zip(columns_plot, batch):
-                                    #             sub = chart_data[chart_data["Fitur"] == fitur]
-                                    #             chart_title = FEATURE_LABELS.get(fitur, fitur)
-                                    #             chart = (
-                                    #                 alt.Chart(sub)
-                                    #                 .mark_bar()
-                                    #                 .encode(
-                                    #                     x=alt.X("Pemain:N", axis=alt.Axis(title=None, labelAngle=0)),
-                                    #                     y=alt.Y("Nilai:Q", axis=alt.Axis(title=None)),
-                                    #                     color=alt.Color("Pemain:N", title=None, scale=alt.Scale(scheme="tableau10")),
-                                    #                     tooltip=["Pemain:N", "Nilai:Q"],
-                                    #                 )
-                                    #                 .properties(
-                                    #                     title={
-                                    #                         "text": chart_title,
-                                    #                         "anchor": "middle",
-                                    #                         "align": "center",                                                        
-                                    #                     },                                                    
-                                    #                     width="container", 
-                                    #                     height=220
-                                    #                 )
-                                    #             )
-                                    #             with c:
-                                    #                 st.altair_chart(chart)
-    
+                                    )                                  
+
     return st

@@ -9,7 +9,6 @@ from sklearn.preprocessing import normalize
 
 # FITUR YANG AKAN DITAMPILKAN DALAM HASIL PERBANDINGAN
 FEATURES_TO_COMPARE = [
-    # "age", "appearance", "total_minute",
     "total_goal", "assist", "shot_per_game", "sot_per_game", 
     "total_duel_per_game", "aerial_duel_per_game",
     "successful_dribble_per_game", "key_pass_per_game",
@@ -116,47 +115,9 @@ def get_recommend_similar_players(
 
     return recommend_result.reset_index(drop=True)
 
-# MEMBACA FITUR UNTUK YANG DIPAKAI UNTUK PEMAIN ACUAN DAN PEMAIN REKOMENDASI
-def get_feature_data(feat_df: pd.DataFrame, anchor_player: str, target_player: str, features: list[str]) -> tuple[pd.Series, pd.Series]:
-    position_features = ["player_name", *features]
-    anchor = feat_df.loc[feat_df["player_name"] == anchor_player, position_features]
-    recommend = feat_df.loc[feat_df["player_name"] == target_player, position_features]
-    if anchor.empty:
-        raise ValueError(f"Data fitur pemain acuan '{anchor_player}' tidak ditemukan.")
-    if recommend.empty:
-        raise ValueError(f"Data fitur pemain rekomendasi '{target_player}' tidak ditemukan.")
-    return anchor.iloc[0], recommend.iloc[0]
-
-# ==================================================================================================================================
-# UNTUK MEMBUAT CHART PERBANDINGAN
-def get_comparison_data(anchor_row: pd.Series, recommend_row: pd.Series, features: list[str]) -> pd.DataFrame:
-    df = pd.DataFrame({
-        "Fitur": features,
-        anchor_row["player_name"]: [anchor_row[f] for f in features],
-        recommend_row["player_name"]: [recommend_row[f] for f in features],
-    })
-    chart_data = df.melt(id_vars="Fitur", var_name="Pemain", value_name="Nilai")
-    return chart_data
-
-def get_comparison_chart_data(features: pd.DataFrame, anchor_player: str, target_player: str, features_to_compare: list[str]) -> pd.DataFrame:
-    anchor_row, recommend_row = get_feature_data(features, anchor_player, target_player, features_to_compare)
-    return get_comparison_data(anchor_row, recommend_row, features_to_compare)
-
 # ==================================================================================================================================
 
-def _feature_scale_per_feature(df: pd.DataFrame, features: list[str], q=0.98):
-    scale = {}
-    for f in features:
-        s = pd.to_numeric(df[f], errors="coerce")
-        vmin, vmax = np.nanmin(s), np.nanquantile(s, q)
-        if not np.isfinite(vmin):
-            vmin = 0.0
-        if not np.isfinite(vmax) or vmax <= vmin:
-            vmax = np.nanmax(s)
-        scale[f] = max(vmax - vmin, 1e-6)
-    return scale
-
-def fm_compare_hconcat(
+def build_comparison_section(
     st,
     features_df: pd.DataFrame,
     anchor_player: str,
@@ -164,70 +125,68 @@ def fm_compare_hconcat(
     features_to_compare: list[str],
 ):
     cols = ["player_name", *features_to_compare]
-    A = features_df.loc[features_df["player_name"] == anchor_player, cols]
-    B = features_df.loc[features_df["player_name"] == target_player, cols]
+    anchor_data = features_df.loc[features_df["player_name"] == anchor_player, cols]
+    target_data = features_df.loc[features_df["player_name"] == target_player, cols]
 
-    if A.empty or B.empty:
+    if anchor_data.empty or target_data.empty:
         raise ValueError("Data pemain tidak ditemukan.")
 
-    A = A.iloc[0]
-    B = B.iloc[0]
-
-    # scale = _feature_scale_per_feature(features_df, features_to_compare, q=0.98)
+    anchor_data = anchor_data.iloc[0]
+    target_data = target_data.iloc[0]
 
     label = [FEATURE_LABELS.get(f, f) for f in features_to_compare]
 
     rows = []
-    for f in features_to_compare:
-        va = float(A[f])
-        vb = float(B[f])
-        d_raw  = vb - va
-
+    for feature in features_to_compare:
+        value_anchor = float(anchor_data[feature])
+        value_target = float(target_data[feature])
+        diff_raw  = value_target - value_anchor
         
-        vmax = max(abs(va), abs(vb), 1e-6)
-        d_norm = np.clip(d_raw / vmax, -1.0, 1.0)
+        max_value = max(abs(value_anchor), abs(value_target), 1e-6)
+        diff_scaled = np.clip(diff_raw / max_value, -1.0, 1.0)
 
         rows.append({
-            "Fitur": FEATURE_LABELS.get(f, f),
-            "val_left": va,
-            "val_right": vb,
-            "diff_raw": d_raw,
-            "left_fill": (-abs(d_norm)) if d_norm < 0 else 0.0,
-            "right_fill": (abs(d_norm)) if d_norm > 0 else 0.0,
+            "Statistik": FEATURE_LABELS.get(feature, feature),
+            "Nilai Pemain Acuan": value_anchor,
+            "Nilai Pemain Rekomendasi": value_target,
+            "Selisih": diff_raw,
+            "Bar Kiri": (-abs(diff_scaled)) if diff_scaled < 0 else 0.0,
+            "Bar Kanan": (abs(diff_scaled)) if diff_scaled > 0 else 0.0,
         })
 
     df = pd.DataFrame(rows)
     dom = [-1, 1]
-    bar_h = 32 * len(features_to_compare)
+    bar_height = 32 * len(features_to_compare)
 
     ax_none_x = alt.Axis(title=None, labels=False, ticks=False, domain=False)
     ax_none_y = alt.Axis(title=None, labels=False, ticks=False, domain=False)
 
     # ===== Kolom 1: nama statistik =====
-    names_chart = (
+    stats = (
         alt.Chart(df)
         .mark_text(
             align="center", 
             dx=0, 
             fontWeight="bold",
-            fontSize=16
+            fontSize=16,
+            tooltip=False
         )
         .encode(
-            y=alt.Y("Fitur:N", sort=label, axis=ax_none_y),
-            text="Fitur:N",
-            color=alt.value("white"),
+            y=alt.Y("Statistik:N", sort=label, axis=ax_none_y),
+            text="Statistik:N",
+            color=alt.value("white"),            
         )
         .properties(
-            height=bar_h
+            height=bar_height
         )
     )
 
     # ===== Kolom 2: bar chart
     bg = (
         alt.Chart(df)
-        .mark_bar(color="#eeeeee")
+        .mark_bar(color="#eeeeee", tooltip=False)
         .encode(
-            y=alt.Y("Fitur:N", sort=features_to_compare, axis=ax_none_y),
+            y=alt.Y("Statistik:N", sort=features_to_compare, axis=ax_none_y),
             x=alt.X("bg_min:Q", scale=alt.Scale(domain=dom), axis=ax_none_x),
             x2="bg_max:Q",
         )
@@ -243,81 +202,81 @@ def fm_compare_hconcat(
 
     left_bar = (
         alt.Chart(df)
-        .mark_bar(color="#f59e0b")
+        .mark_bar(color="#f59e0b", tooltip=False)
         .encode(
-            y=alt.Y("Fitur:N", sort=features_to_compare, axis=ax_none_y),
+            y=alt.Y("Statistik:N", sort=features_to_compare, axis=ax_none_y),
             x=alt.X("zero:Q", scale=alt.Scale(domain=dom), axis=ax_none_x),
-            x2="left_fill:Q",
+            x2="Bar Kiri:Q",
         )
         .transform_calculate(zero="0")
     )
 
     right_bar = (
         alt.Chart(df)
-        .mark_bar(color="#3b82f6")
+        .mark_bar(color="#3b82f6", tooltip=False)
         .encode(
-            y=alt.Y("Fitur:N", sort=features_to_compare, axis=ax_none_y),
+            y=alt.Y("Statistik:N", sort=features_to_compare, axis=ax_none_y),
             x=alt.X("zero:Q", scale=alt.Scale(domain=dom), axis=ax_none_x),
-            x2="right_fill:Q",
+            x2="Bar Kanan:Q",
         )
         .transform_calculate(zero="0")
     )
 
     left_txt = (
         alt.Chart(df)
-        .mark_text(align="right", dx=-8, fontWeight="bold", fontSize=16)
+        .mark_text(align="right", dx=-8, fontWeight="bold", fontSize=16, tooltip=False)
         .encode(
-            y=alt.Y("Fitur:N", sort=features_to_compare, axis=ax_none_y),
+            y=alt.Y("Statistik:N", sort=features_to_compare, axis=ax_none_y),
             x=alt.X("xpos:Q", scale=alt.Scale(domain=dom), axis=ax_none_x),
-            text=alt.Text("val_left:Q", format=".1f"),
+            text=alt.Text("Nilai Pemain Acuan:Q", format=".1f"),
             color=alt.value("#f9fafb"),
         )
-        .transform_calculate(xpos="-1.05")
+        .transform_calculate(xpos="-1")
     )
 
     right_txt = (
         alt.Chart(df)
-        .mark_text(align="left", dx=8, fontWeight="bold", fontSize=16)
+        .mark_text(align="left", dx=8, fontWeight="bold", fontSize=16, tooltip=False)
         .encode(
-            y=alt.Y("Fitur:N", sort=features_to_compare, axis=ax_none_y),
+            y=alt.Y("Statistik:N", sort=features_to_compare, axis=ax_none_y),
             x=alt.X("xpos:Q", scale=alt.Scale(domain=dom), axis=ax_none_x),
-            text=alt.Text("val_right:Q", format=".1f"),
+            text=alt.Text("Nilai Pemain Rekomendasi:Q", format=".1f"),
             color=alt.value("#f9fafb"),
         )
-        .transform_calculate(xpos="1.05")
+        .transform_calculate(xpos="1")
     )
 
     bars_chart = (bg + left_bar + right_bar + mid + left_txt + right_txt).properties(
-        height=bar_h
+        height=bar_height
     )
 
     # ===== Kolom 3: Nilai Selisih
-    delta_chart = (
+    diff_value = (
         alt.Chart(df)
         .transform_calculate(
             diff_label=(
-                "datum.diff_raw == 0 ? '-' : format(abs(datum.diff_raw), '.1f')"
+                "datum.Selisih == 0 ? '-' : format(abs(datum.Selisih), '.1f')"
             ),
             diff_color=(
-                "datum.diff_raw == 0 ? '#FFFFFF' : "
-                "datum.diff_raw > 0 ? '#3B82F6' : '#F59E0B'"
+                "datum.Selisih == 0 ? '#FFFFFF' : " #PUTIH
+                "datum.Selisih > 0 ? '#3B82F6' : '#F59E0B'" #KIRI ORANGE, KANAN BIRU
             )
         )
-        .mark_text(align="center", dx=0, fontWeight="bold", fontSize=16)
+        .mark_text(align="center", dx=0, fontWeight="bold", fontSize=16, tooltip=False)
         .encode(
-            y=alt.Y("Fitur:N", sort=features_to_compare, axis=ax_none_y),
+            y=alt.Y("Statistik:N", sort=features_to_compare, axis=ax_none_y),
             text="diff_label:N",
             color=alt.Color("diff_color:N", scale=None)
             
         )
-        .properties(height=bar_h)
+        .properties(height=bar_height)
     )
 
     col1, col2, col3 = st.columns([2, 3, 2])
     with col1:
-        st.altair_chart(names_chart)
+        st.altair_chart(stats)
     with col2:
         st.altair_chart(bars_chart)
     with col3:
-        st.altair_chart(delta_chart)
+        st.altair_chart(diff_value)
     return st
