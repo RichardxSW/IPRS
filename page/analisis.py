@@ -1,4 +1,5 @@
 from matplotlib import pyplot as plt
+import seaborn as sns
 import numpy as np
 import pandas as pd
 from players.bar_chart import BarDataMissing, get_cluster_feature_chart_data, get_features_for_group
@@ -150,7 +151,10 @@ def get_analisis_page(st):
                                     continue
 
                                 chart_data["Fitur"] = pd.Categorical(chart_data["Fitur"], categories=features, ordered=True)
-                                clusters_order = sorted(chart_data["Cluster"].unique(), key=lambda s: int(s[1:]))
+                                clusters_order = sorted(
+                                    chart_data["Cluster"].unique(),
+                                    key=lambda s: int(str(s).lstrip("C"))
+                                )
                                 chart_data["Cluster"] = pd.Categorical(chart_data["Cluster"], categories=clusters_order, ordered=True)
 
                                 c1, c2 = st.columns(2, vertical_alignment="top")
@@ -163,20 +167,30 @@ def get_analisis_page(st):
                                         if sub.empty:
                                             with columns[i % 3]:
                                                 st.empty()
+                                            continue
                                         
                                         # BAR CHART
                                         chart_title = FEATURE_LABELS.get(fitur, fitur)
+
                                         chart = (
                                             alt.Chart(sub)
-                                            .mark_bar()
+                                            .mark_boxplot(
+                                                size=120,
+                                                # box={"stroke": "white", "strokeWidth": 2},      # border box
+                                                # median={"color": "white", "strokeWidth": 3},    # garis median
+                                                rule={"color": "white"},                        # whisker line
+                                                # ticks={"color": "white"},                       # garis kecil di ujung whisker
+                                                # outliers={"color": "white"}                     # outlier point
+                                            )
                                             .encode(
                                                 x=alt.X("Cluster:N", axis=alt.Axis(title=None, labelAngle=0)),
-                                                y=alt.Y("Mean:Q", axis=alt.Axis(title=None)),
-                                                color=alt.Color("Cluster:N", title=None, scale=alt.Scale(scheme="tableau10")),
+                                                y=alt.Y("Value:Q", axis=alt.Axis(title=None)),
+                                                color=alt.Color("Cluster:N", legend=None),
                                                 tooltip=[
-                                                    "Cluster:N",
-                                                    alt.Tooltip("Mean:Q", title="Rata-rata", format=".3f")
-                                                ],
+                                                    alt.Tooltip("Cluster:N", title="Cluster"),
+                                                    alt.Tooltip("Fitur:N", title="Fitur"),
+                                                    alt.Tooltip("Value:Q", title="Nilai", format=".3f"),
+                                                ]
                                             )
                                             .properties(
                                                 title={"text": chart_title, "anchor": "middle", "align": "center"},
@@ -184,8 +198,50 @@ def get_analisis_page(st):
                                                 height=220,
                                             )
                                         )
+
                                         with columns[i % 2]:
-                                            st.altair_chart(chart)
+                                            st.altair_chart(chart, use_container_width=True)
+
+                                        # BOX PLOT SEABORN
+                                        # fig, ax = plt.subplots(figsize=(5, 3))
+
+                                        # sns.boxplot(
+                                        #     data=sub,
+                                        #     x="Cluster",
+                                        #     y="Value",
+                                        #     order=clusters_order,
+                                        #     ax=ax,
+                                        # )
+
+                                        # ax.set_title(chart_title)
+                                        # ax.set_xlabel("Cluster")
+                                        # ax.set_ylabel(chart_title)
+
+                                        # with columns[i % 2]:
+                                        #     st.pyplot(fig)
+
+                                        # plt.close(fig)
+
+                                        # chart = (
+                                        #     alt.Chart(sub)
+                                        #     .mark_bar()
+                                        #     .encode(
+                                        #         x=alt.X("Cluster:N", axis=alt.Axis(title=None, labelAngle=0)),
+                                        #         y=alt.Y("Mean:Q", axis=alt.Axis(title=None)),
+                                        #         color=alt.Color("Cluster:N", title=None, scale=alt.Scale(scheme="tableau10")),
+                                        #         tooltip=[
+                                        #             "Cluster:N",
+                                        #             alt.Tooltip("Mean:Q", title="Rata-rata", format=".3f")
+                                        #         ],
+                                        #     )
+                                        #     .properties(
+                                        #         title={"text": chart_title, "anchor": "middle", "align": "center"},
+                                        #         # width=420,
+                                        #         height=220,
+                                        #     )
+                                        # )
+                                        # with columns[i % 2]:
+                                        #     st.altair_chart(chart)
                                 else:
                                     st.info("Tidak ada statistik yang ditemukan.")
 
