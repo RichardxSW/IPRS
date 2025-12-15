@@ -157,6 +157,68 @@ def get_analisis_page(st):
                                 )
                                 chart_data["Cluster"] = pd.Categorical(chart_data["Cluster"], categories=clusters_order, ordered=True)
 
+                                # UNTUK LAPORAN
+                                # chart_data = chart_data.copy()
+                                # chart_data["FiturLabel"] = chart_data["Fitur"].apply(lambda f: FEATURE_LABELS.get(f, f))
+
+                                # clusters_order = sorted(chart_data["Cluster"].unique(), key=lambda s: int(str(s).lstrip("C")))
+                                # fitur_order    = [FEATURE_LABELS.get(f, f) for f in features]  # mengikuti urutan `features` kamu
+
+                                # facet_cols = 3
+
+                                # base = (
+                                #     alt.Chart(chart_data)
+                                #     .mark_boxplot(
+                                #         size=60,
+                                #         rule={"color": "white"},
+                                #         box={"stroke": "white", "strokeWidth": 2},
+                                #         median={"color": "white", "strokeWidth": 3},
+                                #         ticks={"color": "white"},
+                                #         outliers={"color": "white"},
+                                #     )
+                                #     .encode(
+                                #         x=alt.X("Cluster:N", sort=clusters_order, axis=alt.Axis(title=None, labelAngle=0)),
+                                #         y=alt.Y("Value:Q", axis=alt.Axis(title=None)),
+                                #         color=alt.Color("Cluster:N", legend=alt.Legend(title="Cluster")),
+                                #         tooltip=[
+                                #             alt.Tooltip("FiturLabel:N", title="Fitur"),
+                                #             alt.Tooltip("Cluster:N", title="Cluster"),
+                                #             alt.Tooltip("Value:Q", title="Nilai", format=".3f"),
+                                #         ],
+                                #     )
+                                #     .properties(
+                                #         width=250,
+                                #         height=180,
+                                #         title="Distribusi Statistik per Cluster (Boxplot)",
+                                #     )
+                                # )
+
+                                # chart = (
+                                #     base.facet(
+                                #         facet=alt.Facet("FiturLabel:N", sort=fitur_order, title=None),
+                                #         columns=facet_cols
+                                #     )
+                                #     .resolve_scale(
+                                #         y="independent"
+                                #     )
+                                #     .configure_axis(
+                                #         labelColor="white",
+                                #         titleColor="white",
+                                #         gridColor="rgba(255,255,255,0.15)",
+                                #         domainColor="rgba(255,255,255,0.3)",
+                                #         tickColor="rgba(255,255,255,0.3)",
+                                #     )
+                                #     .configure_header(
+                                #         labelColor="white",
+                                #         titleColor="white",
+                                #         labelFontSize=12
+                                #     )
+                                #     .configure_title(color="white")
+                                # )
+
+                                # st.altair_chart(chart, use_container_width=True)
+
+                                # BOXPLOT
                                 c1, c2 = st.columns(2, vertical_alignment="top")
                                 
                                 if len(features) > 0:
@@ -165,26 +227,21 @@ def get_analisis_page(st):
                                         sub = chart_data[chart_data["Fitur"] == fitur]
 
                                         if sub.empty:
-                                            with columns[i % 3]:
+                                            with columns[i % 2]:
                                                 st.empty()
                                             continue
-                                        
-                                        # BAR CHART
+
                                         chart_title = FEATURE_LABELS.get(fitur, fitur)
 
                                         chart = (
                                             alt.Chart(sub)
                                             .mark_boxplot(
-                                                size=120,
-                                                # box={"stroke": "white", "strokeWidth": 2},      # border box
-                                                # median={"color": "white", "strokeWidth": 3},    # garis median
-                                                rule={"color": "white"},                        # whisker line
-                                                # ticks={"color": "white"},                       # garis kecil di ujung whisker
-                                                # outliers={"color": "white"}                     # outlier point
+                                                size=100,
+                                                rule={"color": "white"},
                                             )
                                             .encode(
                                                 x=alt.X("Cluster:N", axis=alt.Axis(title=None, labelAngle=0)),
-                                                y=alt.Y("Value:Q", axis=alt.Axis(title=None)),
+                                                y=alt.Y("Value:Q", axis=alt.Axis(title=chart_title)),
                                                 color=alt.Color("Cluster:N", legend=None),
                                                 tooltip=[
                                                     alt.Tooltip("Cluster:N", title="Cluster"),
@@ -195,53 +252,12 @@ def get_analisis_page(st):
                                             .properties(
                                                 title={"text": chart_title, "anchor": "middle", "align": "center"},
                                                 # width=420,
-                                                height=220,
+                                                height=240,
                                             )
                                         )
 
                                         with columns[i % 2]:
                                             st.altair_chart(chart, use_container_width=True)
-
-                                        # BOX PLOT SEABORN
-                                        # fig, ax = plt.subplots(figsize=(5, 3))
-
-                                        # sns.boxplot(
-                                        #     data=sub,
-                                        #     x="Cluster",
-                                        #     y="Value",
-                                        #     order=clusters_order,
-                                        #     ax=ax,
-                                        # )
-
-                                        # ax.set_title(chart_title)
-                                        # ax.set_xlabel("Cluster")
-                                        # ax.set_ylabel(chart_title)
-
-                                        # with columns[i % 2]:
-                                        #     st.pyplot(fig)
-
-                                        # plt.close(fig)
-
-                                        # chart = (
-                                        #     alt.Chart(sub)
-                                        #     .mark_bar()
-                                        #     .encode(
-                                        #         x=alt.X("Cluster:N", axis=alt.Axis(title=None, labelAngle=0)),
-                                        #         y=alt.Y("Mean:Q", axis=alt.Axis(title=None)),
-                                        #         color=alt.Color("Cluster:N", title=None, scale=alt.Scale(scheme="tableau10")),
-                                        #         tooltip=[
-                                        #             "Cluster:N",
-                                        #             alt.Tooltip("Mean:Q", title="Rata-rata", format=".3f")
-                                        #         ],
-                                        #     )
-                                        #     .properties(
-                                        #         title={"text": chart_title, "anchor": "middle", "align": "center"},
-                                        #         # width=420,
-                                        #         height=220,
-                                        #     )
-                                        # )
-                                        # with columns[i % 2]:
-                                        #     st.altair_chart(chart)
                                 else:
                                     st.info("Tidak ada statistik yang ditemukan.")
 
