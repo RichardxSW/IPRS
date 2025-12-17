@@ -77,9 +77,9 @@ WSGI_APPLICATION = 'iprs.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'IPRS',           # atau nama DB kamu
+        'NAME': 'IPRS',           # isi nama db
         'USER': 'postgres',
-        'PASSWORD': 'nano4321',   # ganti sesuai password kamu
+        'PASSWORD': 'password',   # isi password db
         'HOST': '127.0.0.1',
         'PORT': '5432',
     }
